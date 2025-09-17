@@ -25,11 +25,11 @@ new class extends Component {
 
     <a href="{{ route('companies.create') }}" class="btn btn-primary">New Company</a>
 
-    {% if session('success') %}
+    @if (session('success'))
         <div class="p-2 mb-2 text-green-700 bg-green-100 rounded">
             {{ session('success') }}
         </div>
-    {% endif %}
+    @endif
 
     <table class="table-auto w-full mt-4 border">
         <thead>
@@ -41,30 +41,30 @@ new class extends Component {
             </tr>
         </thead>
         <tbody>
-            {% for company in companies %}
+            @foreach ($companies as $company)
                 <tr>
                     <td class="border px-4 py-2">
-                        {% if company.logo %}
+                        @if ($company->logo)
                            <img src="{{ asset('storage/' . $company->logo) }}" alt="Logo" class="h-12 w-12 object-contain">
-                        {% endif %}
+                        @endif
                     </td>
-                    <td class="border px-4 py-2">{{ company.name }}</td>
+                    <td class="border px-4 py-2">{{ $company->name }}</td>
                     <td class="border px-4 py-2">
-                        {% if company.color %}
-                            <div class="w-6 h-6 rounded" style="background-color: {{ company.color }}"></div>
-                        {% endif %}
+                        @if ($company->color)
+                            <div class="w-6 h-6 rounded" style="background-color: {{ $company->color }}"></div>
+                        @endif
                     </td>
                     <td class="border px-4 py-2">
-                        <a href="{{ route('companies.edit', company.id) }}" class="btn btn-sm btn-warning">Edit</a>
+                        <a href="{{ route('companies.edit', $company->id) }}" class="btn btn-sm btn-warning">Edit</a>
 
-                        <button wire:click="deleteCompany({{ company.id }})"
+                        <button wire:click="deleteCompany({{ $company->id }})"
                                 class="btn btn-sm btn-danger"
                                 onclick="return confirm('Delete this company?')">
                             Delete
                         </button>
                     </td>
                 </tr>
-            {% endfor %}
+            @endforeach
         </tbody>
     </table>
 </div>
