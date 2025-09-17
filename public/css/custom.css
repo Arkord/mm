@@ -1,0 +1,11 @@
+.text-custom-large {
+    font-size: 3.5em;
+    line-height: 1.1;
+}
+
+.text-custom-medium {
+    font-size: 1.4em;
+    line-height: 1.4;
+    display: block;
+    margin-top: 1.5em;
+}
