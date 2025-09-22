@@ -38,30 +38,30 @@ new class extends Component {
             'logo' => $this->company->logo,
         ]);
 
-        session()->flash('success', 'Company updated successfully.');
+        session()->flash('success', 'Se ha actualizado la empresa.');
         $this->redirectRoute('companies.index');
     }
 }; ?>
 
 <div class="max-w-lg mx-auto">
-    <h1 class="text-xl font-bold mb-4">Edit Company</h1>
+    <h1 class="text-xl font-bold mb-4">Editar empresa</h1>
 
     <form wire:submit.prevent="update" class="space-y-4">
         <div>
-            <label class="block">Name</label>
+            <label class="block">Nombre</label>
             <input type="text" wire:model="name" class="w-full border rounded px-2 py-1">
             @error('name') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
         </div>
 
         <div>
             <label class="block">Color</label>
-            <input type="color" wire:model="color" class="w-16 h-10 border rounded">
+            <input type="color" wire:model="color" class="w-16 h-10 border rounded" style="cursor: pointer">
             @error('color') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
         </div>
 
         <div>
             <label class="block">Logo</label>
-            <input type="file" wire:model="logo" class="w-full">
+            <input type="file" wire:model="logo" class="w-full border-2" style="cursor: pointer">
             @if ($logo)
                 <img src="{{ $logo->temporaryUrl() }}" class="h-16 mt-2">
             @elseif ($company->logo)
@@ -70,6 +70,8 @@ new class extends Component {
             @error('logo') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
         </div>
 
-        <button type="submit" class="btn btn-primary">Update</button>
+        <div class="flex items-center justify-end cursor-pointer mt-10">
+            <flux:button variant="primary" type="submit" class="w-full">{{ __('Actualizar') }}</flux:button>
+        </div>
     </form>
 </div>

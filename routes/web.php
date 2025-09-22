@@ -18,9 +18,19 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('settings/password', 'settings.password')->name('settings.password');
     Volt::route('settings/appearance', 'settings.appearance')->name('settings.appearance');
 
+   
+});
+
+Route::middleware(['auth', 'role:admin'])->group(function () {
+     // Rutas de Companies
     Volt::route('companies', 'companies.index')->name('companies.index');
     Volt::route('companies/create', 'companies.create')->name('companies.create');
     Volt::route('companies/{company}/edit', 'companies.edit')->name('companies.edit');
+
+    // Rutas de Users
+    Volt::route('users', 'users.index')->name('users.index');
+    Volt::route('users/create', 'users.create')->name('users.create');
+    Volt::route('users/{user}/edit', 'users.edit')->name('users.edit');
 });
 
 

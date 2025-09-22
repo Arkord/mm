@@ -61,6 +61,15 @@ select:focus[data-flux-control] {
     @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
 }
 
+option {
+    @apply bg-gray-900;
+}
+
+/* Sobrescribe todos los íconos dentro del navlist de Flux */
+flux\\:navlist flux\\:navlist\\:item svg {
+    width: 2rem !important;  /* 32px = w-8 */
+    height: 2rem !important; /* 32px = h-8 */
+}
 /* \[:where(&)\]:size-4 {
     @apply size-4;
 } */
