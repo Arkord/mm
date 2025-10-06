@@ -23,7 +23,7 @@
                 <flux:tooltip :content="__('Search')" position="bottom">
                     <flux:navbar.item class="!h-10 [&>div>svg]:size-5" icon="magnifying-glass" href="#" :label="__('Search')" />
                 </flux:tooltip>
-                <flux:tooltip :content="__('Repository')" position="bottom">
+                {{-- <flux:tooltip :content="__('Repository')" position="bottom">
                     <flux:navbar.item
                         class="h-10 max-lg:hidden [&>div>svg]:size-5"
                         icon="folder-git-2"
@@ -40,7 +40,7 @@
                         target="_blank"
                         label="Documentation"
                     />
-                </flux:tooltip>
+                </flux:tooltip> --}}
             </flux:navbar>
 
             <!-- Desktop User Menu -->
@@ -72,16 +72,16 @@
 
                     <flux:menu.separator />
 
-                    <flux:menu.radio.group>
+                    {{-- <flux:menu.radio.group>
                         <flux:menu.item :href="route('settings.profile')" icon="cog" wire:navigate>{{ __('Settings') }}</flux:menu.item>
-                    </flux:menu.radio.group>
+                    </flux:menu.radio.group> --}}
 
                     <flux:menu.separator />
 
                     <form method="POST" action="{{ route('logout') }}" class="w-full">
                         @csrf
                         <flux:menu.item as="button" type="submit" icon="arrow-right-start-on-rectangle" class="w-full">
-                            {{ __('Log Out') }}
+                            {{ __('Cerrar sesión') }}
                         </flux:menu.item>
                     </form>
                 </flux:menu>
