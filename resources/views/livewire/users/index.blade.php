@@ -2,11 +2,13 @@
 
 use App\Models\User;
 use App\Models\Company;
+use App\Models\Buy;
+use App\Models\Expense;
+use App\Models\Sale;
 use Livewire\Volt\Component;
 
 new class extends Component {
     public $users;
-
     public $showDeleteModal = false;
     public $userToDelete;
 
@@ -25,12 +27,30 @@ new class extends Component {
     public function deleteUser()
     {
         if ($this->userToDelete) {
-            $this->userToDelete->delete();
-            $this->users = User::with('company')->get();
-            session()->flash('success', 'El usuario ha sido eliminado.');
+            $hasBuys = Buy::where('user_id', $this->userToDelete->id)->exists();
+            $hasExpenses = Expense::where('user_id', $this->userToDelete->id)->exists();
+            $hasSales = Sale::where('user_id', $this->userToDelete->id)->exists();
+
+            if ($hasBuys || $hasExpenses || $hasSales) {
+                session()->flash('error', 'No se puede eliminar el usuario porque tiene registros relacionados (compras, gastos o ventas).');
+            } else {
+                $this->userToDelete->delete();
+                $this->users = User::with('company')->get();
+                session()->flash('success', 'El usuario ha sido eliminado.');
+            }
         }
 
-        $this->reset(['showDeleteModal', 'userToDelete']); // cierra modal y limpia
+        $this->reset(['showDeleteModal', 'userToDelete']);
+    }
+
+    public function toggleStatus($userId)
+    {
+        $user = User::find($userId);
+        if ($user) {
+            $user->toggleStatus();
+            $this->users = User::with('company')->get();
+            session()->flash('success', 'El estado del usuario ha sido actualizado.');
+        }
     }
 };
 ?>
@@ -46,6 +66,12 @@ new class extends Component {
         </div>
     @endif
 
+    @if (session('error'))
+        <div class="p-2 mb-2 mt-2 text-red-700 bg-red-100 rounded">
+            {{ session('error') }}
+        </div>
+    @endif
+
     <table class="table-auto w-full mt-4 border border-gray-500">
         <thead>
             <tr class="border-gray-500">
@@ -53,7 +79,8 @@ new class extends Component {
                 <th class="px-4 py-2">Usuario</th>
                 <th class="px-4 py-2">Rol</th>
                 <th class="px-4 py-2">Compañía</th>
-                <th class="px-4 py-2 text-center w-40">Acciones</th>
+                <th class="px-4 py-2">Estado</th>
+                <th class="px-4 py-2 text-center w-64">Acciones</th>
             </tr>
         </thead>
         <tbody>
@@ -63,14 +90,22 @@ new class extends Component {
                     <td class="border px-4 py-2 border-gray-500">{{ $user->username }}</td>
                     <td class="border px-4 py-2 border-gray-500">{{ $user->role }}</td>
                     <td class="border px-4 py-2 border-gray-500">{{ $user->company?->name }}</td>
-                    <td class="border px-4 py-2 text-center w-70 border-gray-500">
+                    <td class="border px-4 py-2 border-gray-500">
+                        <span class="{{ $user->isActive() ? 'text-green-600' : 'text-red-600' }}">
+                            {{ $user->status === 'active' ? 'Activo' : 'Inactivo' }}
+                        </span>
+                    </td>
+                    <td class="border px-4 py-2 text-center w-96 border-gray-500">
+                        <button wire:click="toggleStatus({{ $user->id }})"
+                                class="bg-blue-500 text-white rounded-sm px-3 py-1 text-sm hover:bg-blue-600 cursor-pointer w-25 mb-1">
+                            {{ $user->status === 'active' ? 'Desactivar' : 'Activar' }}
+                        </button>
                         <a href="{{ route('users.edit', $user->id) }}"
-                           class="bg-amber-500 text-white rounded-sm px-3 py-1 inline-block text-sm w-25">
+                           class="bg-amber-500 text-white rounded-sm px-3 py-1 inline-block text-sm w-25 mb-1">
                             Editar
                         </a>
-
                         <button wire:click="confirmDelete({{ $user->id }})"
-                                class="bg-red-500 text-white rounded-sm px-3 py-1 text-sm hover:bg-red-600 cursor-pointer w-25">
+                                class="bg-red-500 text-white rounded-sm px-3 py-1 text-sm hover:bg-red-600 cursor-pointer w-25 mb-1">
                             Eliminar
                         </button>
                     </td>
@@ -84,7 +119,6 @@ new class extends Component {
          x-show="open"
          class="fixed inset-0 flex items-center justify-center z-50"
          x-cloak>
-
         <!-- Fondo -->
         <div class="absolute inset-0 bg-black" @click="open = false" style="opacity: 0.7"></div>
 

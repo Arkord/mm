@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
@@ -12,9 +13,6 @@ use Livewire\Attributes\Validate;
 use Livewire\Volt\Component;
 
 new #[Layout('components.layouts.auth')] class extends Component {
-    // #[Validate('required|string|email')]
-    // public string $email = '';
-
     #[Validate('required|string')]
     public string $username = '';
 
@@ -32,9 +30,17 @@ new #[Layout('components.layouts.auth')] class extends Component {
 
         $this->ensureIsNotRateLimited();
 
+        // Check if user exists and is inactive
+        $user = User::where('username', $this->username)->first();
+        if ($user && $user->status === 'inactive') {
+            RateLimiter::hit($this->throttleKey());
+            throw ValidationException::withMessages([
+                'username' => __('El usuario está inactivo. Contacta al administrador.'),
+            ]);
+        }
+
         if (! Auth::attempt(['username' => $this->username, 'password' => $this->password], $this->remember)) {
             RateLimiter::hit($this->throttleKey());
-
             throw ValidationException::withMessages([
                 'username' => __('auth.failed'),
             ]);
@@ -74,11 +80,12 @@ new #[Layout('components.layouts.auth')] class extends Component {
     {
         return Str::transliterate(Str::lower($this->username).'|'.request()->ip());
     }
-}; ?>
+};
+?>
 
 <div class="flex flex-col gap-6">
     <div class="flex justify-center">
-        <img src="img/logo.png" alt="logo" class="w-10">
+        <img src="img/logo.png" alt="logo" class="w-24">
     </div>
     <x-auth-header :title="__('Ingresar a tu cuenta')" :description="__('Ingresa tus credenciales es los campos de abajo')" />
 
@@ -86,17 +93,6 @@ new #[Layout('components.layouts.auth')] class extends Component {
     <x-auth-session-status class="text-center" :status="session('status')" />
 
     <form method="POST" wire:submit="login" class="flex flex-col gap-6">
-        <!-- Email Address 
-        <flux:input
-            wire:model="email"
-            :label="__('Email address')"
-            type="email"
-            required
-            autofocus
-            autocomplete="email"
-            placeholder="email@example.com"
-        />-->
-
         <!-- Username -->
         <flux:input
             wire:model="username"
@@ -119,12 +115,6 @@ new #[Layout('components.layouts.auth')] class extends Component {
                 :placeholder="__('Contraseña')"
                 viewable
             />
-
-            {{-- @if (Route::has('password.request'))
-                <flux:link class="absolute end-0 top-0 text-sm" :href="route('password.request')" wire:navigate>
-                    {{ __('Forgot your password?') }}
-                </flux:link>
-            @endif --}}
         </div>
 
         <!-- Remember Me -->

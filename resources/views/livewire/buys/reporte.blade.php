@@ -4,6 +4,7 @@ use App\Models\BuyItem;
 use App\Models\Expense;
 use App\Models\Cash;
 use App\Models\Sale;
+use App\Models\Company;
 use Livewire\Volt\Component;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
@@ -29,9 +30,11 @@ new class extends Component {
     public $selectedYear;
     public $selectedMonth;
     public $selectedWeek;
+    public $selectedCompany;
     public $years = [];
     public $months = [];
     public $weeks = [];
+    public $companies = [];
 
     /**
      * Sanitize a value for JSON (Livewire) and Excel (UTF-8 encoding).
@@ -80,6 +83,10 @@ new class extends Component {
     {
         $today = now();
 
+        // Inicializar empresas
+        $this->companies = Company::all()->pluck('name', 'id')->toArray();
+        $this->selectedCompany = Auth::user()->company_id ?? array_key_first($this->companies);
+
         // Inicializar años y meses
         $this->years = range(2020, $today->year);
         $this->months = range(1, 12);
@@ -94,6 +101,12 @@ new class extends Component {
 
         // Cargar ítems iniciales
         $this->loadItems();
+    }
+
+    // Reactividad al cambiar empresa
+    public function updatedSelectedCompany($value)
+    {
+        $this->adjustWeeksAndReload();
     }
 
     // Reactividad al cambiar año
@@ -169,9 +182,7 @@ new class extends Component {
 
     public function loadItems()
     {
-        $companyId = Auth::user()->company_id;
-
-        if (!isset($this->weeks[$this->selectedWeek])) {
+        if (!$this->selectedCompany || !isset($this->weeks[$this->selectedWeek])) {
             $this->items = collect();
             $this->expenses = collect();
             $this->totalCaja = 0;
@@ -182,6 +193,7 @@ new class extends Component {
             return;
         }
 
+        $companyId = $this->selectedCompany;
         $start = $this->weeks[$this->selectedWeek]['start'];
         $end = $this->weeks[$this->selectedWeek]['end'];
 
@@ -220,9 +232,9 @@ new class extends Component {
 
     private function getDataForWeek($week)
     {
-        $companyId = Auth::user()->company_id;
+        $companyId = $this->selectedCompany;
 
-        if (!isset($this->weeks[$week])) {
+        if (!isset($this->weeks[$week]) || !$companyId) {
             return [
                 'items' => collect(),
                 'expenses' => collect(),
@@ -661,7 +673,7 @@ new class extends Component {
             $materials = array_map([$this, 'sanitizeForJson'], $materials);
             $materialsMergeEndCol = Coordinate::stringFromColumnIndex(count($materials) * 3);
 
-            $companyName = $this->sanitizeForJson(Auth::user()->company->name ?? 'Reporte Multimetal');
+            $companyName = $this->sanitizeForJson(Company::find($this->selectedCompany)->name ?? 'Reporte Multimetal');
 
             $spreadsheet = new Spreadsheet();
 
@@ -731,6 +743,15 @@ new class extends Component {
 
     <div class="mb-4 flex gap-4 items-end">
         <div>
+            <label for="company-select" class="block text-sm font-medium">Empresa:</label>
+            <select wire:model.live="selectedCompany" id="company-select" class="border px-2 py-1 rounded">
+                @foreach ($companies as $id => $name)
+                    <option value="{{ $id }}">{{ $name }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div>
             <label for="year-select" class="block text-sm font-medium">Año:</label>
             <select wire:model.live="selectedYear" id="year-select" class="border px-2 py-1 rounded">
                 @foreach ($years as $year)
@@ -762,7 +783,6 @@ new class extends Component {
             </select>
         </div>
 
-        <a href="{{ route('buys.create') }}" class="bg-amber-100 text-black p-2 rounded-sm">Registrar compra</a>
         <div class="relative">
             <button wire:click="exportToExcel" class="bg-green-500 text-white p-2 rounded-sm cursor-pointer relative" wire:loading.class="opacity-50 cursor-not-allowed">
                 <span wire:loading.remove>Descargar XLSX</span>

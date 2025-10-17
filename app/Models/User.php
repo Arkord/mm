@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -10,7 +9,6 @@ use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
 
     /**
@@ -21,9 +19,10 @@ class User extends Authenticatable
     protected $fillable = [
         'username',
         'name',
-        // 'email',
         'password',
         'company_id',
+        'role',
+        'status',
     ];
 
     /**
@@ -69,5 +68,22 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
+    }
+
+    /**
+     * Check if the user is active
+     */
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
+    }
+
+    /**
+     * Toggle the user's status
+     */
+    public function toggleStatus(): void
+    {
+        $this->status = $this->status === 'active' ? 'inactive' : 'active';
+        $this->save();
     }
 }

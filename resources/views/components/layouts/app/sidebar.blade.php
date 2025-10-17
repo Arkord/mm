@@ -10,7 +10,12 @@
         <flux:sidebar.toggle class="lg:hidden" icon="x-mark" />
 
         <a href="{{ route('dashboard') }}" class="me-5 flex items-center space-x-2 rtl:space-x-reverse" wire:navigate>
-            <x-app-logo />
+            @if (!auth()->user()?->isAdmin() && auth()->user()?->company)
+                <img src="{{ asset('storage/' . auth()->user()->company->logo) }}" alt="{{ auth()->user()->company->name }} Logo" class="h-8 w-8 object-contain">
+                <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ auth()->user()->company->name }}</span>
+            @else
+                <x-app-logo />
+            @endif
         </a>
 
         <flux:navlist variant="outline">
@@ -23,7 +28,8 @@
                         :current="request()->routeIs('buys.index')" wire:navigate>{{ __('Compras') }}
                     </flux:navlist.item>
                     <flux:navlist.item icon="archive-box-x-mark" :href="route('sales.index')"
-                        :current="request()->routeIs('sales.index')" wire:navigate>{{ __('Ventas') }}</flux:navlist.item>
+                        :current="request()->routeIs('sales.index')" wire:navigate>{{ __('Ventas') }}
+                    </flux:navlist.item>
                     <flux:navlist.item icon="currency-dollar" :href="route('expenses.index')"
                         :current="request()->routeIs('expenses.index')" wire:navigate>{{ __('Gastos') }}
                     </flux:navlist.item>
@@ -46,13 +52,18 @@
         <flux:spacer />
 
         <flux:navlist variant="outline">
-            <flux:navlist.item>
-                {{ auth()->user()->company?->name }}
-            </flux:navlist.item>
-            {{-- <flux:navlist.item icon="folder-git-2" href="https://github.com/laravel/livewire-starter-kit" target="_blank">
-                {{ __('Repository') }}
+            {{-- @if (auth()->user()?->company)
+                <flux:navlist.item>
+                    {{ auth()->user()->company->name }}
                 </flux:navlist.item>
-
+            @endif --}}
+            @if (auth()->user()?->isAdmin())
+                <flux:navlist.item icon="document-text" :href="route('buys.reporte')"
+                    :current="request()->routeIs('buys.reporte')">
+                    {{ __('Reporte financiero') }}
+                </flux:navlist.item>
+            @endif
+            {{--
                 <flux:navlist.item icon="book-open-text" href="https://laravel.com/docs/starter-kits#livewire" target="_blank">
                 {{ __('Documentation') }}
                 </flux:navlist.item> --}}
@@ -88,7 +99,7 @@
                         <flux:menu.item :href="route('settings.profile')" icon="cog" wire:navigate>{{ __('Settings') }}</flux:menu.item>
                     </flux:menu.radio.group> --}}
 
-                <flux:menu.separator />
+                {{-- <flux:menu.separator /> --}}
 
                 <form method="POST" action="{{ route('logout') }}" class="w-full">
                     @csrf
@@ -134,8 +145,6 @@
                     <flux:menu.item :href="route('settings.profile')" icon="cog" wire:navigate>
                         {{ __('Settings') }}</flux:menu.item>
                 </flux:menu.radio.group> --}}
-
-                <flux:menu.separator />
 
                 <form method="POST" action="{{ route('logout') }}" class="w-full">
                     @csrf

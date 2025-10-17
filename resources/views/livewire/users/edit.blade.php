@@ -70,9 +70,9 @@ new class extends Component {
         </div>
 
         <div>
-            <label class="block font-semibold">Compañía</label>
+            <label class="block font-semibold">Empresa</label>
             <select wire:model="company_id" class="w-full border rounded px-3 py-2">
-                <option value="">-- Seleccionar compañía --</option>
+                <option value="">-- Seleccionar empresa --</option>
                 @foreach (App\Models\Company::all() as $company)
                     <option value="{{ $company->id }}">{{ $company->name }}</option>
                 @endforeach

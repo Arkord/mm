@@ -6,12 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Sale extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'fecha',
-        'buy_id',
-        'buy_item_id',
         'material',
         'company_id',
         'user_id',
@@ -19,17 +15,6 @@ class Sale extends Model
         'precio_kg',
         'total',
     ];
-
-    // Relaciones
-    public function buy()
-    {
-        return $this->belongsTo(Buy::class);
-    }
-
-    public function buyItem()
-    {
-        return $this->belongsTo(BuyItem::class);
-    }
 
     public function company()
     {
@@ -40,4 +25,10 @@ class Sale extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function saleBuyItems()
+    {
+        return $this->hasMany(SaleBuyItem::class);
+    }
 }
+?>

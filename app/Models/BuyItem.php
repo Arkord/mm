@@ -12,4 +12,16 @@ class BuyItem extends Model
     {
         return $this->belongsTo(Buy::class);
     }
+
+    public function saleBuyItems()
+    {
+        return $this->hasMany(SaleBuyItem::class);
+    }
+
+    public function availableKgs()
+    {
+        $soldKgs = $this->saleBuyItems()->sum('kgs');
+        return $this->kgs - $soldKgs;
+    }
 }
+?>

@@ -1,11 +1,14 @@
 <?php
 
 use App\Models\Company;
+use App\Models\Buy;
+use App\Models\Expense;
+use App\Models\Sale;
+use App\Models\User;
 use Livewire\Volt\Component;
 
 new class extends Component {
     public $companies;
-
     public $showDeleteModal = false;
     public $companyToDelete;
 
@@ -24,12 +27,22 @@ new class extends Component {
     public function deleteCompany()
     {
         if ($this->companyToDelete) {
-            $this->companyToDelete->delete();
-            $this->companies = Company::all();
-            session()->flash('success', 'La empresa se ha eliminado.');
+            // Check for related records
+            $hasBuys = Buy::where('company_id', $this->companyToDelete->id)->exists();
+            $hasExpenses = Expense::where('company_id', $this->companyToDelete->id)->exists();
+            $hasSales = Sale::where('company_id', $this->companyToDelete->id)->exists();
+            $hasUsers = User::where('company_id', $this->companyToDelete->id)->exists();
+
+            if ($hasBuys || $hasExpenses || $hasSales || $hasUsers) {
+                session()->flash('error', 'No se puede eliminar la empresa porque tiene registros relacionados (compras, gastos, ventas o usuarios).');
+            } else {
+                $this->companyToDelete->delete();
+                $this->companies = Company::all();
+                session()->flash('success', 'La empresa se ha eliminado.');
+            }
         }
 
-        $this->reset(['showDeleteModal', 'companyToDelete']); // cierra modal y limpia
+        $this->reset(['showDeleteModal', 'companyToDelete']);
     }
 };
 ?>
@@ -42,6 +55,12 @@ new class extends Component {
     @if (session('success'))
         <div class="p-2 mb-2 mt-2 text-green-700 bg-green-100 rounded">
             {{ session('success') }}
+        </div>
+    @endif
+
+    @if (session('error'))
+        <div class="p-2 mb-2 mt-2 text-red-700 bg-red-100 rounded">
+            {{ session('error') }}
         </div>
     @endif
 
@@ -72,11 +91,9 @@ new class extends Component {
                     </td>
                     <td class="border px-4 py-2 text-center w-70 border-gray-500">
                         <a href="{{ route('companies.edit', $company->id) }}"
-                            class="bg-amber-500 text-white rounded-sm px-3 py-1  inline-block text-sm w-25">
+                            class="bg-amber-500 text-white rounded-sm px-3 py-1 inline-block text-sm w-25">
                             Editar
                         </a>
-
-                        <!-- Botón para abrir modal -->
                         <button wire:click="confirmDelete({{ $company->id }})"
                             class="bg-red-500 text-white rounded-sm px-3 py-1 text-sm hover:bg-red-600 cursor-pointer w-25">
                             Eliminar
@@ -89,7 +106,6 @@ new class extends Component {
 
     <!-- Modal global -->
     <div x-data="{ open: @entangle('showDeleteModal') }" x-show="open" class="fixed inset-0 flex items-center justify-center z-50" x-cloak>
-
         <!-- Fondo -->
         <div class="absolute inset-0 bg-black" @click="open = false" style="opacity: 0.7"></div>
 
@@ -104,11 +120,10 @@ new class extends Component {
                 <button @click="open = false" class="px-4 py-2 bg-gray-400 rounded text-white hover:bg-gray-400 cursor-pointer">
                     Cancelar
                 </button>
-                <button wire:click="deleteCompany" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600  cursor-pointer">
+                <button wire:click="deleteCompany" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 cursor-pointer">
                     Eliminar
                 </button>
             </div>
         </div>
     </div>
-
 </div>
