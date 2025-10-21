@@ -4,11 +4,13 @@ use App\Models\User;
 use App\Models\Company;
 use Livewire\Volt\Component;
 use Illuminate\Support\Facades\Hash;
+use App\Mail\UserPasswordMail;
 
 new class extends Component {
     public $name;
     public $username;
     public $password;
+    public $email;
     public $company_id;
     public $role;
 
@@ -18,17 +20,22 @@ new class extends Component {
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users,username',
             'password' => 'required|string|min:6',
+            'email' => 'required|email|max:255|unique:users,email',
             'company_id' => 'required|exists:companies,id',
             'role' => 'required|string',
         ]);
 
-        User::create([
+        $user = User::create([
             'name' => $this->name,
             'username' => $this->username,
             'password' => Hash::make($this->password),
+            'email' => $this->email,
             'company_id' => $this->company_id,
             'role' => $this->role,
         ]);
+
+        //  Enviar el correo con la contraseña en texto plano
+        Mail::to($this->email)->send(new UserPasswordMail($user, $this->password));
 
         session()->flash('success', 'Usuario creado exitosamente.');
 
@@ -44,19 +51,33 @@ new class extends Component {
         <div>
             <label class="block font-semibold">Nombre</label>
             <input type="text" wire:model="name" class="w-full border rounded px-3 py-2">
-            @error('name') <span class="text-red-500">{{ $message }}</span> @enderror
+            @error('name')
+                <span class="text-red-500">{{ $message }}</span>
+            @enderror
         </div>
 
         <div>
             <label class="block font-semibold">Usuario</label>
             <input type="text" wire:model="username" class="w-full border rounded px-3 py-2">
-            @error('username') <span class="text-red-500">{{ $message }}</span> @enderror
+            @error('username')
+                <span class="text-red-500">{{ $message }}</span>
+            @enderror
         </div>
 
         <div>
             <label class="block font-semibold">Contraseña</label>
             <input type="password" wire:model="password" class="w-full border rounded px-3 py-2">
-            @error('password') <span class="text-red-500">{{ $message }}</span> @enderror
+            @error('password')
+                <span class="text-red-500">{{ $message }}</span>
+            @enderror
+        </div>
+
+        <div>
+            <label class="block font-semibold">Correo electrónico</label>
+            <input type="email" wire:model="email" class="w-full border rounded px-3 py-2">
+            @error('email')
+                <span class="text-red-500">{{ $message }}</span>
+            @enderror
         </div>
 
         <div>
@@ -67,7 +88,9 @@ new class extends Component {
                     <option value="{{ $company->id }}">{{ $company->name }}</option>
                 @endforeach
             </select>
-            @error('company_id') <span class="text-red-500">{{ $message }}</span> @enderror
+            @error('company_id')
+                <span class="text-red-500">{{ $message }}</span>
+            @enderror
         </div>
 
         <div>
@@ -77,10 +100,12 @@ new class extends Component {
                 <option value="admin">Admin</option>
                 <option value="user">Usuario</option>
             </select>
-            @error('role') <span class="text-red-500">{{ $message }}</span> @enderror
+            @error('role')
+                <span class="text-red-500">{{ $message }}</span>
+            @enderror
         </div>
 
         <flux:button variant="primary" type="submit" class="w-50 cursor-pointer">{{ __('Guardar') }}</flux:button>
-        
+
     </form>
 </div>

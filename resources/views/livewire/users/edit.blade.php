@@ -4,6 +4,7 @@ use App\Models\User;
 use App\Models\Company;
 use Livewire\Volt\Component;
 use Illuminate\Support\Facades\Hash;
+use App\Mail\UserPasswordMail;
 
 new class extends Component {
     public User $user;
@@ -11,6 +12,7 @@ new class extends Component {
     public $name;
     public $username;
     public $password;
+    public $email;
     public $company_id;
     public $role;
 
@@ -19,6 +21,7 @@ new class extends Component {
         $this->user = $user;
         $this->name = $user->name;
         $this->username = $user->username;
+        $this->email = $user->email;
         $this->company_id = $user->company_id;
         $this->role = $user->role;
     }
@@ -28,9 +31,13 @@ new class extends Component {
         $this->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users,username,' . $this->user->id,
+            'email' => 'required|email|max:255|unique:users,email,' . $this->user->id,
             'company_id' => 'required|exists:companies,id',
             'role' => 'required|string',
         ]);
+
+        $passwordChanged = false;
+        $plainPassword = $this->password;
 
         $this->user->update([
             'name' => $this->name,
@@ -39,6 +46,16 @@ new class extends Component {
             'role' => $this->role,
             'password' => $this->password ? Hash::make($this->password) : $this->user->password,
         ]);
+
+        // Verificar si cambió la contraseña
+        if ($this->password) {
+            $passwordChanged = true;
+        }
+
+        // Enviar correo solo si cambió contraseña o email
+        if ($passwordChanged || $this->email !== $this->user->email) {
+            Mail::to($this->email)->send(new UserPasswordMail($this->user, $plainPassword ?? '(sin cambios)'));
+        }
 
         session()->flash('success', 'Usuario actualizado exitosamente.');
 
@@ -70,6 +87,12 @@ new class extends Component {
         </div>
 
         <div>
+            <label class="block font-semibold">Correo electrónico</label>
+            <input type="email" wire:model="email" class="w-full border rounded px-3 py-2">
+            @error('email') <span class="text-red-500">{{ $message }}</span> @enderror
+        </div>
+
+        <div>
             <label class="block font-semibold">Empresa</label>
             <select wire:model="company_id" class="w-full border rounded px-3 py-2">
                 <option value="">-- Seleccionar empresa --</option>
@@ -90,6 +113,6 @@ new class extends Component {
             @error('role') <span class="text-red-500">{{ $message }}</span> @enderror
         </div>
 
-        <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded">Actualizar</button>
+        <button type="submit" class="bg-amber-500 text-white px-4 py-2 rounded cursor-pointer">Actualizar</button>
     </form>
 </div>
