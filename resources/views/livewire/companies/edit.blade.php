@@ -46,7 +46,7 @@ new class extends Component {
 <div class="max-w-lg mx-auto">
     <h1 class="text-xl font-bold mb-4">Editar empresa</h1>
 
-    <form wire:submit.prevent="update" class="space-y-4">
+    <form wire:submit.prevent="update" class="space-y-4" enctype="multipart/form-data">
         <div>
             <label class="block">Nombre</label>
             <input type="text" wire:model="name" class="w-full border rounded px-2 py-1">
