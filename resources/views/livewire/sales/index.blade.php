@@ -129,7 +129,7 @@ new class extends Component {
         $this->selectedBuyItemIds = [];
         $this->totalKgs = 0;
         $this->total = 0;
-        $this->fecha = now()->format('Y-m-d');
+        $this->fecha = now()->setTimezone('America/Mexico_City')->format('Y-m-d');
     }
 
     public function loadItems()
@@ -175,7 +175,7 @@ new class extends Component {
         $this->precio_kg = 0;
         $this->total = 0;
         $this->totalKgs = 0;
-        $this->fecha = now()->format('Y-m-d');
+        $this->fecha = now()->setTimezone('America/Mexico_City')->format('Y-m-d');
     }
 
     public function cancelCreatingSale()
@@ -187,7 +187,7 @@ new class extends Component {
         $this->total = 0;
         $this->totalKgs = 0;
         $this->showConfirmModal = false;
-        $this->fecha = now()->format('Y-m-d');
+        $this->fecha = now()->setTimezone('America/Mexico_City')->format('Y-m-d');
     }
 
     public function toggleSelectAll()

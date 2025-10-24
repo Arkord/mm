@@ -18,7 +18,7 @@ new class extends Component {
 
     public function mount()
     {
-        $this->fecha = now()->format('Y-m-d');
+        $this->fecha = now()->setTimezone('America/Mexico_City')->format('Y-m-d');
         $this->company_id = Auth::user()->company_id;
         $this->items = [['material' => '', 'kgs' => 0, 'precio_kg' => 0, 'total' => 0]];
     }
