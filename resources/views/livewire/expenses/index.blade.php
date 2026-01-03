@@ -132,14 +132,16 @@ new class extends Component {
         @enderror
 
         <label class="block text-sm mt-4 mb-2">Monto</label>
-        <input type="number" step="0.01" wire:model="monto"
-            class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-800 dark:text-white">
-
+        <div x-data="{ initial: @js($monto) ?? 0 }" x-init="initMontoCleave()">
+            <input type="text" x-ref="montoInput" placeholder="$0.00"
+                class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-800 dark:text-white text-right font-mono text-sm">
+        </div>
         @error('monto')
             <span class="text-red-500 text-sm">{{ $message }}</span>
         @enderror
 
-        <button wire:click="openConfirmModal" class="mt-4 bg-amber-500 text-white rounded px-4 py-2 hover:bg-amber-600 cursor-pointer">
+        <button wire:click="openConfirmModal"
+            class="mt-4 bg-amber-500 text-white rounded px-4 py-2 hover:bg-amber-600 cursor-pointer">
             Guardar gasto
         </button>
     </div>
@@ -236,3 +238,58 @@ new class extends Component {
         </div>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/cleave.js@1.6.0/dist/cleave.min.js"></script>
+
+<script>
+    function initMontoCleave() {
+        return function() {
+            const input = this.$refs.montoInput;
+            let initialValue = this.initial ?? 0;
+
+            if (!initialValue || isNaN(initialValue)) initialValue = 0;
+
+            // Destruir instancia anterior
+            if (input.cleave) input.cleave.destroy();
+
+            // === FORZAR $0.00 VISUALMENTE ===
+            input.value = '$0.00';
+
+            // Crear Cleave
+            input.cleave = new Cleave(input, {
+                numeral: true,
+                numeralThousandsGroupStyle: 'thousand',
+                numeralDecimalScale: 2,
+                numeralDecimalMark: '.',
+                delimiter: ',',
+                prefix: '$',
+                rawValueTrimPrefix: true,
+                numeralPositiveOnly: true,
+                onValueChanged: function(e) {
+                    const raw = e.target.rawValue || '0';
+                    let num = parseFloat(raw) || 0;
+
+                    // Si el usuario borra todo, mantener 0
+                    if (raw === '' || raw === '$') num = 0;
+
+                    // Actualizar Livewire
+                    @this.set('monto', num);
+
+                    // === FORZAR $0.00 SI ES 0 ===
+                    if (num === 0) {
+                        setTimeout(() => {
+                            if (input.value.trim() === '' || input.value === '$') {
+                                input.value = '$0.00';
+                            }
+                        }, 0);
+                    }
+                }
+            });
+
+            // Aplicar valor inicial solo si > 0
+            if (initialValue > 0) {
+                input.cleave.setRawValue(initialValue);
+            }
+        };
+    }
+</script>

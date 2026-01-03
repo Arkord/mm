@@ -16,7 +16,7 @@ new class extends Component {
         $this->validate([
             'name' => 'required|string|max:255',
             'color' => 'required|string',
-            'logo' => 'nullable|image|max:10240', // 1MB
+            'logo' => 'nullable|image|max:10240',
         ]);
 
         $path = $this->logo ? $this->logo->store('companies', 'public') : null;

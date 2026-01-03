@@ -12,7 +12,7 @@ new class extends Component {
 
     public $totalGeneral = 0;
 
-    public $materials = ['FIERRO', 'LAMINA', 'COBRE', 'BRONCE', 'ALUMINIO', 'BOTE', 'ARCHIVO', 'CARTON', 'PLASTICO', 'PET', 'BATERIAS', 'OTRO'];
+    public $materials = ['FIERRO', 'LAMINA', 'COBRE', 'BRONCE', 'ALUMINIO', 'BOTE', 'ARCHIVO', 'CARTON', 'PLASTICO', 'PET', 'BATERIAS', 'VIDRIO'];
 
     public $showConfirmModal = false;
 
@@ -117,14 +117,23 @@ new class extends Component {
                         @endforeach
                     </select>
 
-                    <input type="number" step="0.001" wire:model.live="items.{{ $i }}.kgs"
-                        placeholder="Kgs" class="border rounded p-2">
+                    <!-- Peso -->
+                    <div x-data="{ index: {{ $i }}, initial: @js($item['kgs']) ?? 0 }" x-init="initPesoCleave()">
+                        <input type="text" x-ref="pesoInput" placeholder="0.000"
+                            class="border rounded p-2 text-right font-mono text-sm w-full">
+                    </div>
 
-                    <input type="number" step="0.01" wire:model.live="items.{{ $i }}.precio_kg"
-                        placeholder="Precio/kg" class="border rounded p-2">
+                    <!-- Precio -->
+                    <div x-data="{ index: {{ $i }}, initial: @js($item['precio_kg']) ?? 0 }" x-init="initCleave()">
+                        <input type="text" x-ref="precioInput" placeholder="$0.00"
+                            class="border rounded p-2 text-right font-mono text-sm w-full">
+                    </div>
 
-                    <input type="text" readonly value="{{ number_format($item['total'], 2) }}"
-                        class="border rounded p-2 bg-gray-900">
+                    <!-- Total -->
+                    <input type="text" readonly
+                        :value="(@js($item['total']) > 0 ? '$' + Number(@js($item['total'])).toLocaleString(
+                            'es-MX', { minimumFractionDigits: 2 }) : '$0.00')"
+                        class="border rounded p-2 bg-gray-900 text-right font-mono text-sm">
                 </div>
             @endforeach
 
@@ -134,8 +143,8 @@ new class extends Component {
         </div>
 
         <div class="flex justify-end mt-6">
-            <div class="text-lg font-bold">
-                Total General: ${{ number_format($totalGeneral, 2) }}
+            <div class="text-lg font-bold text-right">
+                Total General: <span class="font-mono">${{ number_format($totalGeneral, 2) }}</span>
             </div>
         </div>
 
@@ -175,3 +184,104 @@ new class extends Component {
     </div>
 
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/cleave.js@1.6.0/dist/cleave.min.js"></script>
+
+<script>
+    function initCleave() {
+        return function() {
+            const input = this.$refs.precioInput;
+            const index = this.index;
+            let initialValue = this.initial ?? 0;
+
+            if (!initialValue || isNaN(initialValue)) initialValue = 0;
+
+            if (input.cleave) input.cleave.destroy();
+
+            // === FORZAR $0.00 SIEMPRE ===
+            input.value = '$0.00';
+
+            input.cleave = new Cleave(input, {
+                numeral: true,
+                numeralThousandsGroupStyle: 'thousand',
+                numeralDecimalScale: 2,
+                numeralDecimalMark: '.',
+                delimiter: ',',
+                prefix: '$',
+                rawValueTrimPrefix: true,
+                numeralPositiveOnly: true,
+                onValueChanged: function(e) {
+                    const raw = e.target.rawValue || '0';
+                    let num = parseFloat(raw) || 0;
+
+                    // Si el usuario borra todo, mantener 0
+                    if (raw === '' || raw === '$') num = 0;
+
+                    @this.set(`items.${index}.precio_kg`, num);
+
+                    // === FORZAR $0.00 SI EL VALOR ES 0 ===
+                    if (num === 0) {
+                        setTimeout(() => {
+                            if (input.value.trim() === '' || input.value === '$') {
+                                input.value = '$0.00';
+                            }
+                        }, 0);
+                    }
+                }
+            });
+
+            // === NO USAR setRawValue(0) → CAUSA EL PROBLEMA ===
+            // En su lugar, si hay valor, aplícalo
+            if (initialValue > 0) {
+                input.cleave.setRawValue(initialValue);
+            }
+        };
+    }
+
+    function initPesoCleave() {
+        return function() {
+            const input = this.$refs.pesoInput;
+            const index = this.index;
+            let initialValue = this.initial ?? 0;
+
+            if (!initialValue || isNaN(initialValue)) initialValue = 0;
+
+            if (input.cleave) input.cleave.destroy();
+
+            // === FORZAR 0.000 SIEMPRE ===
+            input.value = '0.000';
+
+            input.cleave = new Cleave(input, {
+                numeral: true,
+                numeralThousandsGroupStyle: 'none',
+                numeralDecimalScale: 3,
+                numeralDecimalMark: '.',
+                delimiter: '',
+                numeralPositiveOnly: true,
+                onValueChanged: function(e) {
+                    const raw = e.target.rawValue || '0';
+                    let num = parseFloat(raw) || 0;
+
+                    // Si el usuario borra todo, mantener 0
+                    if (raw === '') num = 0;
+
+                    @this.set(`items.${index}.kgs`, num);
+
+                    // === FORZAR 0.000 SI EL VALOR ES 0 ===
+                    if (num === 0) {
+                        setTimeout(() => {
+                            if (input.value.trim() === '') {
+                                input.value = '0.000';
+                            }
+                        }, 0);
+                    }
+                }
+            });
+
+            // === NO USAR setRawValue(0) ===
+            if (initialValue > 0) {
+                input.cleave.setRawValue(initialValue);
+            }
+        };
+    }
+</script>

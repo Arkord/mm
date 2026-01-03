@@ -669,7 +669,7 @@ new class extends Component {
     public function exportToExcel()
     {
         try {
-            $materials = ['FIERRO', 'LAMINA', 'COBRE', 'BRONCE', 'ALUMINIO', 'BOTE', 'ARCHIVO', 'CARTON', 'PLASTICO', 'PET', 'BATERIAS', 'OTRO'];
+            $materials = ['FIERRO', 'LAMINA', 'COBRE', 'BRONCE', 'ALUMINIO', 'BOTE', 'ARCHIVO', 'CARTON', 'PLASTICO', 'PET', 'BATERIAS', 'VIDRIO'];
             $materials = array_map([$this, 'sanitizeForJson'], $materials);
             $materialsMergeEndCol = Coordinate::stringFromColumnIndex(count($materials) * 3);
 
@@ -733,7 +733,7 @@ new class extends Component {
 }; ?>
 
 <div class="p-6">
-    <h1 class="text-xl font-bold mb-6">Criterios</h1>
+    <h1 class="text-xl font-bold mb-6">Reporte financiero</h1>
 
     @if ($errors->has('export'))
         <div class="text-red-500 mb-4">
@@ -816,7 +816,7 @@ new class extends Component {
                             'PLASTICO',
                             'PET',
                             'BATERIAS',
-                            'OTRO',
+                            'VIDRIO',
                         ];
                         $materials = array_map(fn($m) => $this->sanitizeForJson($m), $materials);
                         $grouped = $items->groupBy('material');

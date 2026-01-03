@@ -17,18 +17,17 @@ Route::middleware(['auth'])->group(function () {
     Volt::route('settings/profile', 'settings.profile')->name('settings.profile');
     Volt::route('settings/password', 'settings.password')->name('settings.password');
     Volt::route('settings/appearance', 'settings.appearance')->name('settings.appearance');
-
-    // Rutas de Expenses
-    Volt::route('expenses', 'expenses.index')->name('expenses.index');
-    Volt::route('expenses/create', 'expenses.create')->name('expenses.create');
 });
 
 Route::middleware(['auth', 'role:user'])->group(function () {
     Volt::route('buys', 'buys.index')->name('buys.index');
     Volt::route('buys/create', 'buys.create')->name('buys.create');
 
-    Volt::route('sales', 'sales.index')->name('sales.index');
-    Volt::route('sales/create', 'sales.create')->name('sales.create');
+    // Rutas de Expenses
+    Volt::route('expenses', 'expenses.index')->name('expenses.index');
+    Volt::route('expenses/create', 'expenses.create')->name('expenses.create');
+
+    Volt::route('patio', 'sales.patio')->name('sales.patio');
 });
 
 Route::middleware(['auth', 'role:admin'])->group(function () {
@@ -46,8 +45,14 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Volt::route('users/create', 'users.create')->name('users.create');
     Volt::route('users/{user}/edit', 'users.edit')->name('users.edit');
 
-    // Ruta de Reporte
+    // Ruta de Reportes
     Volt::route('reports/financiero', 'buys.reporte')->name('buys.reporte');
+    Volt::route('reports/inventario', 'buys.reporte-inventario')->name('buys.reporte-inventario');
+
+    Volt::route('sales', 'sales.index')->name('sales.index');
+    Volt::route('sales/create', 'sales.create')->name('sales.create');
+
+    Volt::route('patio-update', 'sales.patio-update')->name('sales.patio-update');
 });
 
 require __DIR__ . '/auth.php';

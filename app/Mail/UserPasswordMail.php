@@ -22,7 +22,7 @@ class UserPasswordMail extends Mailable
 
     public function build()
     {
-        return $this->subject('Tu cuenta ha sido creada en Multimetales')
+        return $this->subject('Tu cuenta ha sido creada en Corpotativo Multimetales')
                     ->markdown('emails.user-password');
     }
 }

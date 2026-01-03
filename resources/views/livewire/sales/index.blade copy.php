@@ -3,7 +3,6 @@
 use App\Models\Sale;
 use App\Models\BuyItem;
 use App\Models\SaleBuyItem;
-use App\Models\Company; // Asegúrate de tener este modelo
 use Livewire\Volt\Component;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
@@ -14,8 +13,6 @@ new class extends Component {
     public $selectedYear;
     public $selectedMonth;
     public $selectedMaterial;
-    public $selectedCompanyId; // NUEVO
-    public $companies = []; // NUEVO
     public $materials = ['FIERRO', 'LAMINA', 'COBRE', 'BRONCE', 'ALUMINIO', 'BOTE', 'ARCHIVO', 'CARTON', 'PLASTICO', 'PET', 'BATERIAS', 'VIDRIO'];
     public $years = [];
     public $months = [];
@@ -31,12 +28,49 @@ new class extends Component {
     public $showConfirmModal = false;
     public $fecha;
 
+    /**
+     * Sanitize a value for JSON (Livewire) and display (UTF-8 encoding).
+     */
+    private function sanitizeForJson($value)
+    {
+        if (is_null($value) || $value === '-' || is_numeric($value)) {
+            return $value;
+        }
+
+        $string = (string) $value;
+        Log::debug('Sanitizing value', ['raw' => bin2hex($string), 'value' => $string]);
+
+        if (function_exists('mb_convert_encoding')) {
+            $sanitized = mb_convert_encoding($string, 'UTF-8', 'auto');
+            Log::debug('Sanitized to UTF-8', ['sanitized' => $sanitized]);
+            return $sanitized;
+        } elseif (function_exists('iconv')) {
+            $sanitized = iconv('UTF-8', 'UTF-8//IGNORE', $string);
+            Log::debug('Sanitized with iconv', ['sanitized' => $sanitized]);
+            return $sanitized;
+        }
+
+        $sanitized = utf8_encode($string);
+        Log::debug('Sanitized with utf8_encode', ['sanitized' => $sanitized]);
+        return $sanitized;
+    }
+
+    /**
+     * Sanitize collection data for Livewire JSON serialization.
+     */
+    private function sanitizeCollection($collection)
+    {
+        return $collection->map(function ($item) {
+            if (isset($item->material)) {
+                $item->material = $this->sanitizeForJson($item->material);
+            }
+            return $item;
+        });
+    }
+
     public function mount()
     {
         $today = now();
-
-        // Cargar empresas disponibles
-        $this->loadCompanies();
 
         // Inicializar años y meses
         $this->years = range(2020, $today->year);
@@ -45,38 +79,11 @@ new class extends Component {
         // Establecer valores iniciales
         $this->selectedYear = $today->year;
         $this->selectedMonth = $today->month;
-        $this->selectedMaterial = $this->materials[0];
-        $this->selectedCompanyId = Auth::user()->company_id; // Valor por defecto
+        $this->selectedMaterial = $this->materials[0]; // Default to FIERRO
         $this->fecha = $today->format('Y-m-d');
 
         // Cargar ítems iniciales
         $this->loadItems();
-    }
-
-    private function loadCompanies()
-    {
-        // Opción 1: Si el usuario es admin, puede ver todas
-        // Opción 2: Si no, solo su empresa (o las que tenga asignadas)
-
-        if (auth()->user()?->isAdmin()) {
-            // Ajusta según tu sistema de roles
-            $this->companies = Company::orderBy('name')->get();
-        } else {
-            $this->companies = Company::where('id', Auth::user()->company_id)->get();
-        }
-
-        // Asegurarse de que el usuario no seleccione una empresa inválida
-        if (!$this->companies->contains('id', $this->selectedCompanyId)) {
-            $this->selectedCompanyId = $this->companies->first()?->id;
-        }
-    }
-
-    // Reactividad al cambiar empresa
-    public function updatedSelectedCompanyId($value)
-    {
-        $this->loadItems();
-        $this->resetSaleState();
-        Log::info('Company filter changed', ['selectedCompanyId' => $value]);
     }
 
     // Reactividad al cambiar año
@@ -84,6 +91,7 @@ new class extends Component {
     {
         $this->loadItems();
         $this->resetSaleState();
+        Log::info('Year filter changed', ['selectedYear' => $value, 'totalKgs' => $this->totalKgs, 'selectAll' => $this->selectAll]);
     }
 
     // Reactividad al cambiar mes
@@ -91,6 +99,7 @@ new class extends Component {
     {
         $this->loadItems();
         $this->resetSaleState();
+        Log::info('Month filter changed', ['selectedMonth' => $value, 'totalKgs' => $this->totalKgs, 'selectAll' => $this->selectAll]);
     }
 
     // Reactividad al cambiar material
@@ -98,6 +107,7 @@ new class extends Component {
     {
         $this->loadItems();
         $this->resetSaleState();
+        Log::info('Material filter changed', ['selectedMaterial' => $value, 'totalKgs' => $this->totalKgs, 'selectAll' => $this->selectAll]);
     }
 
     private function resetSaleState()
@@ -111,7 +121,9 @@ new class extends Component {
 
     public function loadItems()
     {
-        if (!$this->selectedYear || !$this->selectedMonth || !$this->selectedMaterial || !$this->selectedCompanyId) {
+        $companyId = Auth::user()->company_id;
+
+        if (!$this->selectedYear || !$this->selectedMonth || !$this->selectedMaterial) {
             $this->sales = collect();
             $this->buyItems = collect();
             return;
@@ -120,17 +132,17 @@ new class extends Component {
         $start = Carbon::create($this->selectedYear, $this->selectedMonth, 1)->startOfMonth();
         $end = $start->copy()->endOfMonth();
 
-        $query = Sale::general()->where('company_id', $this->selectedCompanyId)->whereDate('fecha', '>=', $start->toDateString())->whereDate('fecha', '<=', $end->toDateString())->where('material', $this->selectedMaterial);
+        $query = Sale::where('company_id', $companyId)->whereDate('fecha', '>=', $start->toDateString())->whereDate('fecha', '<=', $end->toDateString())->where('material', $this->selectedMaterial);
 
         $this->sales = $query->get();
         $this->sales = $this->sanitizeCollection($this->sales);
 
-        // Load BuyItems for selected material and company
+        // Load BuyItems for selected material with purchase date
         $this->buyItems = BuyItem::where('material', $this->selectedMaterial)
-            ->whereHas('buy', function ($q) use ($start, $end) {
-                $q->where('company_id', $this->selectedCompanyId)->whereDate('fecha', '>=', $start->toDateString())->whereDate('fecha', '<=', $end->toDateString());
+            ->whereHas('buy', function ($q) use ($companyId, $start, $end) {
+                $q->where('company_id', $companyId)->whereDate('fecha', '>=', $start->toDateString())->whereDate('fecha', '<=', $end->toDateString());
             })
-            ->with('buy')
+            ->with('buy') // Eager load buy relationship for fecha
             ->get();
 
         Log::info('Loaded sales', ['count' => $this->sales->count()]);
@@ -172,25 +184,42 @@ new class extends Component {
             $this->selectedBuyItemIds = [];
         }
         $this->calculateTotal();
+        Log::info('Toggle Select All', ['selectAll' => $this->selectAll, 'totalKgs' => $this->totalKgs, 'total' => $this->total]);
     }
 
     public function updateTotalKgs()
     {
-        $this->selectAll = count(array_filter($this->selectedBuyItemIds)) === $this->buyItems->filter(fn($item) => $item->availableKgs() > 0)->count();
-
+        $this->selectAll =
+            count(array_filter($this->selectedBuyItemIds)) ===
+            count(
+                $this->buyItems->filter(function ($item) {
+                    return $item->availableKgs() > 0;
+                }),
+            );
         $this->calculateTotal();
+        Log::info('Update Total Kgs', ['selectedBuyItemIds' => $this->selectedBuyItemIds, 'totalKgs' => $this->totalKgs, 'total' => $this->total]);
     }
 
     public function updatedSelectedBuyItemIds($value, $key)
     {
-        $this->updateTotalKgs();
+        $this->selectAll =
+            count(array_filter($this->selectedBuyItemIds)) ===
+            count(
+                $this->buyItems->filter(function ($item) {
+                    return $item->availableKgs() > 0;
+                }),
+            );
+        $this->calculateTotal();
+        Log::info('Selected BuyItem updated', ['buyItemId' => $key, 'selected' => $value, 'totalKgs' => $this->totalKgs, 'total' => $this->total]);
     }
 
     public function updatedPrecioKg($value)
     {
+        Log::debug('Entering updatedPrecioKg', ['input_value' => $value, 'previous_precio_kg' => $this->precio_kg]);
         $this->precio_kg = (float) $value;
         $this->calculateTotal();
-        $this->dispatch('update-total');
+        $this->dispatch('update-total'); // Trigger frontend update
+        Log::info('Precio Kg updated', ['input_value' => $value, 'precio_kg' => $this->precio_kg, 'totalKgs' => $this->totalKgs, 'total' => $this->total]);
     }
 
     public function calculateTotal()
@@ -205,6 +234,7 @@ new class extends Component {
             }
         }
         $this->total = $this->totalKgs * $this->precio_kg;
+        Log::info('Calculate Total', ['totalKgs' => $this->totalKgs, 'precio_kg' => $this->precio_kg, 'total' => $this->total]);
     }
 
     public function confirmSave()
@@ -224,14 +254,7 @@ new class extends Component {
             'fecha' => 'required|date',
             'totalKgs' => 'required|numeric|min:0.001',
             'precio_kg' => 'required|numeric|min:0.01',
-            'selectedCompanyId' => 'required|exists:companies,id',
         ]);
-
-        // Verificar que el usuario puede crear ventas para esta empresa
-        if ( !auth()->user()?->isAdmin()  && Auth::user()->company_id != $this->selectedCompanyId) {
-            $this->addError('selectedCompanyId', 'No tienes permiso para crear ventas en esta empresa.');
-            return;
-        }
 
         $buyItems = $this->buyItems->whereIn('id', array_keys(array_filter($this->selectedBuyItemIds)));
         $this->totalKgs = 0;
@@ -249,15 +272,19 @@ new class extends Component {
             return;
         }
 
+        if ($this->precio_kg <= 0) {
+            $this->addError('precio_kg', 'El precio por kg debe ser mayor a 0.');
+            return;
+        }
+
         $sale = Sale::create([
             'fecha' => $this->fecha,
             'material' => $this->selectedMaterial,
-            'company_id' => $this->selectedCompanyId, // ← Ahora usa la seleccionada
+            'company_id' => Auth::user()->company_id,
             'user_id' => Auth::id(),
             'kgs' => $this->totalKgs,
             'precio_kg' => $this->precio_kg,
             'total' => $this->total,
-            'type' => Sale::TYPE_GENERAL
         ]);
 
         foreach ($buyItems as $buyItem) {
@@ -275,63 +302,12 @@ new class extends Component {
         $this->loadItems();
         $this->cancelCreatingSale();
     }
-
-    public function selectUpTo($currentIndex)
-    {
-        $availableItems = $this->buyItems->filter(fn($item) => $item->availableKgs() > 0);
-        $this->selectedBuyItemIds = [];
-
-        foreach ($availableItems as $index => $buyItem) {
-            if ($index <= $currentIndex) {
-                $this->selectedBuyItemIds[$buyItem->id] = true;
-            }
-        }
-
-        $this->calculateTotal();
-    }
-
-    // ... (sanitizeForJson y sanitizeCollection se mantienen igual)
-    private function sanitizeForJson($value)
-    {
-        if (is_null($value) || $value === '-' || is_numeric($value)) {
-            return $value;
-        }
-
-        $string = (string) $value;
-        if (function_exists('mb_convert_encoding')) {
-            return mb_convert_encoding($string, 'UTF-8', 'auto');
-        } elseif (function_exists('iconv')) {
-            return iconv('UTF-8', 'UTF-8//IGNORE', $string);
-        }
-        return utf8_encode($string);
-    }
-
-    private function sanitizeCollection($collection)
-    {
-        return $collection->map(function ($item) {
-            if (isset($item->material)) {
-                $item->material = $this->sanitizeForJson($item->material);
-            }
-            return $item;
-        });
-    }
 }; ?>
 
 <div class="p-6" x-data x-on:precio-updated.window="$dispatch('input')" class="p-6">
-    <h1 class="text-xl font-bold mb-6 text-amber-600">Ventas General</h1>
+    <h1 class="text-xl font-bold mb-6">Criterios</h1>
 
     <div class="mb-4 flex gap-4 items-end">
-        <!-- Select de Empresa -->
-        <div>
-            <label for="company-select" class="block text-sm font-medium">Empresa:</label>
-            <select wire:model.live="selectedCompanyId" id="company-select" class="border px-2 py-1 rounded">
-                <option value="">-- Seleccionar empresa --</option>
-                @foreach ($companies as $company)
-                    <option value="{{ $company->id }}">{{ $company->name }}</option>
-                @endforeach
-            </select>
-        </div>
-
         <div>
             <label for="year-select" class="block text-sm font-medium">Año:</label>
             <select wire:model.live="selectedYear" id="year-select" class="border px-2 py-1 rounded">
@@ -381,7 +357,7 @@ new class extends Component {
             <tbody>
                 @forelse ($sales as $sale)
                     <tr class="hover:bg-gray-800">
-                        <td class="px-2 py-1 border text-center">{{ $sale->fecha->format('Y-m-d') }}</td>
+                        <td class="px-2 py-1 border text-center">{{ $sale->fecha }}</td>
                         <td class="px-2 py-1 border text-center">{{ $this->sanitizeForJson($sale->material) }}</td>
                         <td class="px-2 py-1 border text-right">
                             {{ $this->sanitizeForJson(number_format($sale->kgs, 3)) }}</td>
@@ -424,40 +400,29 @@ new class extends Component {
             <table class="min-w-full border border-gray-700 text-sm text-gray-300">
                 <thead class="bg-gray-800 text-gray-200">
                     <tr>
-                        <th class="px-2 py-2 border text-center w-12">#</th>
+                        <th class="px-2 py-2 border text-center">
+                            <input type="checkbox" wire:model="selectAll" wire:change="toggleSelectAll" /> Seleccionar
+                            Todos
+                        </th>
                         <th class="px-2 py-2 border text-center">Fecha de Compra</th>
                         <th class="px-2 py-2 border text-center">Disponible (kgs)</th>
-                        <th class="px-2 py-2 border text-center w-16">Sel.</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @php
-                        $filteredItems = $buyItems->filter(function ($buyItem) {
-                            return $buyItem->availableKgs() > 0;
-                        });
-                    @endphp
-                    @forelse ($filteredItems as $index => $buyItem)
+                    @forelse ($buyItems->filter(function ($buyItem) { return $buyItem->availableKgs() > 0; }) as $buyItem)
                         <tr class="hover:bg-gray-800">
-                            <td class="px-2 py-1 border text-center text-xs font-mono text-gray-500">
-                                {{ $index + 1 }}
-                            </td>
                             <td class="px-2 py-1 border text-center">
-                                {{ $buyItem->buy->fecha }}
+                                <input type="checkbox" wire:model="selectedBuyItemIds.{{ $buyItem->id }}"
+                                    wire:change="updateTotalKgs" value="{{ $buyItem->id }}" />
                             </td>
-                            <td class="px-2 py-1 border text-right font-mono">
-                                {{ number_format($buyItem->availableKgs(), 3) }}
-                            </td>
-                            <td class="px-2 py-1 border text-center">
-                                <input type="checkbox" wire:model.live="selectedBuyItemIds.{{ $buyItem->id }}"
-                                    wire:change="selectUpTo({{ $index }})"
-                                    class="w-5 h-5 rounded border-gray-600 focus:ring-amber-500" />
+                            <td class="px-2 py-1 border text-center">{{ $buyItem->buy->fecha }}</td>
+                            <td class="px-2 py-1 border text-right">{{ number_format($buyItem->availableKgs(), 3) }}
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="4" class="px-2 py-1 border text-center text-gray-500">
-                                No hay ítems disponibles para este material.
-                            </td>
+                            <td colspan="3" class="px-2 py-1 border text-center">No hay ítems disponibles para este
+                                material.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -489,8 +454,7 @@ new class extends Component {
         </div>
 
         <!-- Modal de confirmación -->
-        <div x-data="{ open: @entangle('showConfirmModal') }" x-show="open" class="fixed inset-0 flex items-center justify-center z-50"
-            x-cloak>
+        <div x-data="{ open: @entangle('showConfirmModal') }" x-show="open" class="fixed inset-0 flex items-center justify-center z-50" x-cloak>
             <!-- Fondo oscuro -->
             <div class="absolute inset-0 bg-black" @click="open = false" style="opacity: 0.7"></div>
 

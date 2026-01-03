@@ -8,7 +8,7 @@ use Carbon\Carbon;
 new class extends Component {
     public $cashList;
 
-    // Campos del formulario
+    // Formulario
     public $company_id = '';
     public $monto = '';
     public $fecha = '';
@@ -16,8 +16,10 @@ new class extends Component {
     // Filtros
     public $selectedYear;
     public $selectedMonth;
+    public $selectedWeek;
     public $years = [];
     public $months = [];
+    public $weeks = []; // ← NUEVO: semanas del mes
 
     // Modal
     public $showConfirmModal = false;
@@ -30,42 +32,104 @@ new class extends Component {
         $this->years = range(2020, $today->year);
         $this->months = range(1, 12);
 
-        // Establecer valores iniciales
+        // Valores iniciales
         $this->selectedYear = $today->year;
         $this->selectedMonth = $today->month;
         $this->fecha = $today->toDateString();
 
-        // Cargar registros iniciales
+        // Generar semanas y seleccionar la actual
+        $this->updateWeeks();
+        $this->selectedWeek = $this->getCurrentWeekOfMonth($today);
+
+        // Cargar datos iniciales
         $this->loadCash();
     }
 
-    // Reactividad al cambiar año
-    public function updatedSelectedYear($value)
+    // Reactividad: cambiar año
+    public function updatedSelectedYear()
+    {
+        $this->adjustWeeksAndReload();
+    }
+
+    // Reactividad: cambiar mes
+    public function updatedSelectedMonth()
+    {
+        $this->adjustWeeksAndReload();
+    }
+
+    // Reactividad: cambiar semana
+    public function updatedSelectedWeek()
     {
         $this->loadCash();
     }
 
-    // Reactividad al cambiar mes
-    public function updatedSelectedMonth($value)
+    // Actualiza semanas y recarga datos
+    private function adjustWeeksAndReload()
     {
+        $this->updateWeeks();
+
+        $today = now();
+        if ($this->selectedYear == $today->year && $this->selectedMonth == $today->month) {
+            $this->selectedWeek = $this->getCurrentWeekOfMonth($today);
+        } else {
+            $this->selectedWeek = array_key_first($this->weeks) ?? 1;
+        }
+
         $this->loadCash();
     }
 
+    // Genera las semanas del mes seleccionado
+    public function updateWeeks()
+    {
+        $this->weeks = [];
+
+        $firstDay = Carbon::create($this->selectedYear, $this->selectedMonth, 1)->startOfDay();
+        $lastDay = $firstDay->copy()->endOfMonth()->endOfDay();
+
+        // Empezar en el primer lunes del mes o después
+        $currentStart = $firstDay->dayOfWeek === Carbon::MONDAY ? $firstDay->copy() : $firstDay->copy()->next(Carbon::MONDAY);
+
+        $weekNumber = 1;
+
+        while ($currentStart->lte($lastDay)) {
+            $weekEnd = $currentStart->copy()->endOfWeek(Carbon::SUNDAY);
+            $start = $currentStart->copy();
+            $end = $weekEnd->copy();
+
+            if ($end->gt($lastDay)) {
+                $end = $lastDay;
+            }
+
+            $this->weeks[$weekNumber] = ['start' => $start, 'end' => $end];
+            $weekNumber++;
+
+            $currentStart = $weekEnd->copy()->addDay();
+        }
+    }
+
+    // Obtiene la semana actual del mes
+    public function getCurrentWeekOfMonth(Carbon $date)
+    {
+        foreach ($this->weeks as $num => $range) {
+            if ($date->between($range['start'], $range['end'])) {
+                return $num;
+            }
+        }
+        return array_key_first($this->weeks) ?? 1;
+    }
+
+    // Carga los registros de caja
     private function loadCash()
     {
-        if (!$this->selectedYear || !$this->selectedMonth) {
+        if (!$this->selectedYear || !$this->selectedMonth || !isset($this->weeks[$this->selectedWeek])) {
             $this->cashList = collect();
             return;
         }
 
-        $start = Carbon::create($this->selectedYear, $this->selectedMonth, 1)->startOfMonth();
-        $end = $start->copy()->endOfMonth();
+        $start = $this->weeks[$this->selectedWeek]['start'];
+        $end = $this->weeks[$this->selectedWeek]['end'];
 
-        $this->cashList = Cash::with('company')
-            ->whereDate('fecha', '>=', $start->toDateString())
-            ->whereDate('fecha', '<=', $end->toDateString())
-            ->orderBy('fecha', 'desc')
-            ->get();
+        $this->cashList = Cash::with('company')->whereDate('fecha', '>=', $start->toDateString())->whereDate('fecha', '<=', $end->toDateString())->orderBy('fecha', 'desc')->get();
     }
 
     public function openConfirmModal()
@@ -87,21 +151,12 @@ new class extends Component {
             'monto' => $this->monto,
         ]);
 
-        // Refrescar lista
         $this->loadCash();
 
-        // Limpiar
         $this->reset(['company_id', 'monto', 'fecha', 'showConfirmModal']);
         $this->fecha = now()->toDateString();
 
         session()->flash('success', 'El registro de caja ha sido agregado.');
-    }
-
-    public function with()
-    {
-        return [
-            'cashList' => $this->cashList,
-        ];
     }
 };
 ?>
@@ -112,28 +167,35 @@ new class extends Component {
     <!-- Formulario -->
     <div class="mb-6">
         <label class="block text-sm mb-2">Compañía</label>
-        <select wire:model="company_id"
-                class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-800 dark:text-white">
+        <select wire:model="company_id" class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-800 dark:text-white">
             <option value="">-- Seleccionar compañía --</option>
             @foreach (App\Models\Company::all() as $company)
                 <option value="{{ $company->id }}">{{ $company->name }}</option>
             @endforeach
         </select>
-        @error('company_id') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+        @error('company_id')
+            <span class="text-red-500 text-sm">{{ $message }}</span>
+        @enderror
 
         <label class="block text-sm mt-4 mb-2">Fecha</label>
         <input type="date" wire:model="fecha"
-               class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-800 dark:text-white"
-               max="{{ now()->toDateString() }}">
-        @error('fecha') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+            class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-800 dark:text-white"
+            max="{{ now()->toDateString() }}">
+        @error('fecha')
+            <span class="text-red-500 text-sm">{{ $message }}</span>
+        @enderror
 
         <label class="block text-sm mt-4 mb-2">Monto</label>
-        <input type="number" step="0.01" wire:model="monto"
-               class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-800 dark:text-white">
-        @error('monto') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
+        <div x-data="{ initial: @js($monto) ?? 0 }" x-init="initMontoCleave()">
+            <input type="text" x-ref="montoInput" placeholder="$0.00"
+                class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-800 dark:text-white text-right font-mono text-sm">
+        </div>
+        @error('monto')
+            <span class="text-red-500 text-sm">{{ $message }}</span>
+        @enderror
 
         <button wire:click="openConfirmModal"
-                class="mt-4 bg-amber-500 text-white rounded px-4 py-2 hover:bg-amber-600 cursor-pointer">
+            class="mt-4 bg-amber-500 text-white rounded px-4 py-2 hover:bg-amber-600 cursor-pointer">
             Guardar
         </button>
     </div>
@@ -145,11 +207,11 @@ new class extends Component {
         </div>
     @endif
 
-    <!-- Filtros -->
-    <div class="mb-4 flex gap-4 items-end">
+    <!-- Filtros: Año, Mes, Semana -->
+    <div class="mb-4 flex flex-wrap gap-4 items-end">
         <div>
-            <label for="year-select" class="block text-sm font-medium">Año:</label>
-            <select wire:model.live="selectedYear" id="year-select" class="border px-2 py-1 rounded">
+            <label class="block text-sm font-medium">Año:</label>
+            <select wire:model.live="selectedYear" class="border px-2 py-1 rounded">
                 @foreach ($years as $year)
                     <option value="{{ $year }}">{{ $year }}</option>
                 @endforeach
@@ -157,11 +219,23 @@ new class extends Component {
         </div>
 
         <div>
-            <label for="month-select" class="block text-sm font-medium">Mes:</label>
-            <select wire:model.live="selectedMonth" id="month-select" class="border px-2 py-1 rounded">
+            <label class="block text-sm font-medium">Mes:</label>
+            <select wire:model.live="selectedMonth" class="border px-2 py-1 rounded">
                 @foreach ($months as $month)
                     <option value="{{ $month }}">
                         {{ \Carbon\Carbon::create()->month($month)->locale('es')->isoFormat('MMMM') }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium">Semana:</label>
+            <select wire:model.live="selectedWeek" class="border px-2 py-1 rounded min-w-[260px]">
+                @foreach ($weeks as $num => $range)
+                    <option value="{{ $num }}">
+                        Semana {{ $num }} ({{ $range['start']->locale('es')->isoFormat('DD MMM YYYY') }} -
+                        {{ $range['end']->locale('es')->isoFormat('DD MMM YYYY') }})
                     </option>
                 @endforeach
             </select>
@@ -186,7 +260,8 @@ new class extends Component {
                 </tr>
             @empty
                 <tr>
-                    <td colspan="3" class="border px-4 py-2 text-center">No hay registros de caja para este período.</td>
+                    <td colspan="3" class="border px-4 py-2 text-center">No hay registros de caja para esta semana.
+                    </td>
                 </tr>
             @endforelse
         </tbody>
@@ -199,33 +274,83 @@ new class extends Component {
     </table>
 
     <!-- Modal de confirmación -->
-    <div x-data="{ open: @entangle('showConfirmModal') }"
-         x-show="open"
-         class="fixed inset-0 flex items-center justify-center z-50"
-         x-cloak>
-        <!-- Fondo -->
+    <div x-data="{ open: @entangle('showConfirmModal') }" x-show="open" class="fixed inset-0 flex items-center justify-center z-50" x-cloak>
         <div class="absolute inset-0 bg-black" @click="open = false" style="opacity: 0.7"></div>
 
-        <!-- Caja -->
-        <div x-show="open" x-transition.scale
-             class="relative bg-gray-800 text-gray-200 rounded-lg shadow-lg w-96 p-6">
+        <div x-show="open" x-transition.scale class="relative bg-gray-800 text-gray-200 rounded-lg shadow-lg w-96 p-6">
             <h2 class="text-lg font-bold mb-4">Confirmar registro</h2>
             <p class="mb-6">
-                ¿Registrar en caja 
-                <span class="font-semibold text-amber-400">{{ optional(App\Models\Company::find($company_id))->name }}</span>
+                ¿Registrar en caja
+                <span
+                    class="font-semibold text-amber-400">{{ optional(App\Models\Company::find($company_id))->name }}</span>
                 un monto de <span class="font-semibold text-green-400">${{ number_format($monto ?: 0, 2) }}</span>
                 con fecha <span class="font-semibold text-blue-400">{{ $fecha }}</span>?
             </p>
             <div class="flex justify-end space-x-3">
                 <button @click="open = false"
-                        class="px-4 py-2 bg-gray-400 rounded text-white hover:bg-gray-500 cursor-pointer">
+                    class="px-4 py-2 bg-gray-400 rounded text-white hover:bg-gray-500 cursor-pointer">
                     Cancelar
                 </button>
                 <button wire:click="saveCash"
-                        class="px-4 py-2 bg-amber-500 text-white rounded hover:bg-amber-600 cursor-pointer">
+                    class="px-4 py-2 bg-amber-500 text-white rounded hover:bg-amber-600 cursor-pointer">
                     Confirmar
                 </button>
             </div>
         </div>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/cleave.js@1.6.0/dist/cleave.min.js"></script>
+
+<script>
+    function initMontoCleave() {
+        return function() {
+            const input = this.$refs.montoInput;
+            let initialValue = this.initial ?? 0;
+
+            if (!initialValue || isNaN(initialValue)) initialValue = 0;
+
+            // Destruir instancia anterior
+            if (input.cleave) input.cleave.destroy();
+
+            // === FORZAR $0.00 VISUALMENTE ===
+            input.value = '$0.00';
+
+            // Crear Cleave
+            input.cleave = new Cleave(input, {
+                numeral: true,
+                numeralThousandsGroupStyle: 'thousand',
+                numeralDecimalScale: 2,
+                numeralDecimalMark: '.',
+                delimiter: ',',
+                prefix: '$',
+                rawValueTrimPrefix: true,
+                numeralPositiveOnly: true,
+                onValueChanged: function(e) {
+                    const raw = e.target.rawValue || '0';
+                    let num = parseFloat(raw) || 0;
+
+                    // Si el usuario borra todo, mantener 0
+                    if (raw === '' || raw === '$') num = 0;
+
+                    // Actualizar Livewire
+                    @this.set('monto', num);
+
+                    // === FORZAR $0.00 SI ES 0 ===
+                    if (num === 0) {
+                        setTimeout(() => {
+                            if (input.value.trim() === '' || input.value === '$') {
+                                input.value = '$0.00';
+                            }
+                        }, 0);
+                    }
+                }
+            });
+
+            // Aplicar valor inicial solo si > 0
+            if (initialValue > 0) {
+                input.cleave.setRawValue(initialValue);
+            }
+        };
+    }
+</script>

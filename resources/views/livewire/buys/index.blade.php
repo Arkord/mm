@@ -657,7 +657,7 @@ new class extends Component {
     public function exportToExcel()
     {
         try {
-            $materials = ['FIERRO', 'LAMINA', 'COBRE', 'BRONCE', 'ALUMINIO', 'BOTE', 'ARCHIVO', 'CARTON', 'PLASTICO', 'PET', 'BATERIAS', 'OTRO'];
+            $materials = ['FIERRO', 'LAMINA', 'COBRE', 'BRONCE', 'ALUMINIO', 'BOTE', 'ARCHIVO', 'CARTON', 'PLASTICO', 'PET', 'BATERIAS', 'VIDRIO'];
             $materials = array_map([$this, 'sanitizeForJson'], $materials);
             $materialsMergeEndCol = Coordinate::stringFromColumnIndex(count($materials) * 3);
 
@@ -763,7 +763,7 @@ new class extends Component {
         </div>
 
         <a href="{{ route('buys.create') }}" class="bg-amber-100 text-black p-2 rounded-sm">Registrar compra</a>
-        <div class="relative">
+        {{-- <div class="relative">
             <button wire:click="exportToExcel" class="bg-green-500 text-white p-2 rounded-sm cursor-pointer relative" wire:loading.class="opacity-50 cursor-not-allowed">
                 <span wire:loading.remove>Descargar XLSX</span>
                 <span wire:loading wire:target="exportToExcel" class="flex items-center">
@@ -774,7 +774,7 @@ new class extends Component {
                     Generando...
                 </span>
             </button>
-        </div>
+        </div> --}}
     </div>
 
     <h1 class="text-xl font-bold mb-6">Compras registradas</h1>
@@ -796,7 +796,7 @@ new class extends Component {
                             'PLASTICO',
                             'PET',
                             'BATERIAS',
-                            'OTRO',
+                            'VIDRIO',
                         ];
                         $materials = array_map(fn($m) => $this->sanitizeForJson($m), $materials);
                         $grouped = $items->groupBy('material');
@@ -844,7 +844,7 @@ new class extends Component {
         </table>
     </div>
 
-    <h2 class="text-lg font-semibold mb-4 mt-6">Resumen Financiero y Gastos</h2>
+    {{-- <h2 class="text-lg font-semibold mb-4 mt-6">Resumen Financiero y Gastos</h2>
     <div class="flex gap-4 mb-6">
         <div class="overflow-x-auto flex-1 min-w-0">
             <table class="w-full border border-gray-700 text-sm text-gray-300">
@@ -908,5 +908,5 @@ new class extends Component {
                 </tbody>
             </table>
         </div>
-    </div>
+    </div> --}}
 </div>

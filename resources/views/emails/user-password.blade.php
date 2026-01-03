@@ -1,7 +1,7 @@
 @component('mail::message')
 # Hola {{ $user->name }}
 
-Tu cuenta ha sido creada exitosamente en **Multimetales**.
+Tu cuenta ha sido creada exitosamente en **Corpotativo Multimetales**.
 
 **Usuario:** {{ $user->username }}  
 **Correo:** {{ $user->email }}  
@@ -11,5 +11,5 @@ Tu cuenta ha sido creada exitosamente en **Multimetales**.
 <p><a href="https://multimetales.com.mx">multimetales.com.mx</a></p>
 
 Gracias,  
-**Equipo Multimetales**
+**Equipo Corporativo Multimetales**
 @endcomponent

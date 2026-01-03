@@ -24,6 +24,9 @@ class User extends Authenticatable
         'company_id',
         'role',
         'status',
+        'photo',
+        'address',
+        'phone', 
     ];
 
     /**
@@ -86,5 +89,12 @@ class User extends Authenticatable
     {
         $this->status = $this->status === 'active' ? 'inactive' : 'active';
         $this->save();
+    }
+
+    public function getPhotoUrlAttribute(): string
+    {
+        return $this->photo
+            ? asset('storage/' . $this->photo)
+            : 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&background=6366f1&color=fff';
     }
 }

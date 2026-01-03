@@ -27,9 +27,11 @@
                     <flux:navlist.item icon="archive-box-arrow-down" :href="route('buys.index')"
                         :current="request()->routeIs('buys.index')" wire:navigate>{{ __('Compras') }}
                     </flux:navlist.item>
-                    <flux:navlist.item icon="archive-box-x-mark" :href="route('sales.index')"
-                        :current="request()->routeIs('sales.index')" wire:navigate>{{ __('Ventas') }}
+
+                    <flux:navlist.item icon="archive-box-x-mark" :href="route('sales.patio')"
+                        :current="request()->routeIs('sales.patio')" wire:navigate>{{ __('Ventas Patio') }}
                     </flux:navlist.item>
+
                     <flux:navlist.item icon="currency-dollar" :href="route('expenses.index')"
                         :current="request()->routeIs('expenses.index')" wire:navigate>{{ __('Gastos') }}
                     </flux:navlist.item>
@@ -45,6 +47,14 @@
                     <flux:navlist.item icon="users" :href="route('users.index')"
                         :current="request()->routeIs('users.index')" wire:navigate>{{ __('Usuarios') }}
                     </flux:navlist.item>
+                    <flux:navlist.item icon="archive-box-x-mark" :href="route('sales.index')"
+                        :current="request()->routeIs('sales.index')" wire:navigate>{{ __('Ventas General') }}
+                    </flux:navlist.item>
+
+                     <flux:navlist.item icon="archive-box-x-mark" :href="route('sales.patio-update')"
+                        :current="request()->routeIs('sales.patio-update')" wire:navigate>{{ __('Ventas Patio Precio') }}
+                    </flux:navlist.item>
+
                 @endif
             </flux:navlist.group>
         </flux:navlist>
@@ -58,10 +68,16 @@
                 </flux:navlist.item>
             @endif --}}
             @if (auth()->user()?->isAdmin())
-                <flux:navlist.item icon="document-text" :href="route('buys.reporte')"
+                <flux:navlist.item icon="document-currency-dollar" :href="route('buys.reporte')"
                     :current="request()->routeIs('buys.reporte')">
                     {{ __('Reporte financiero') }}
                 </flux:navlist.item>
+
+                <flux:navlist.item icon="document-text" :href="route('buys.reporte-inventario')"
+                    :current="request()->routeIs('buys.reporte-inventario')">
+                    {{ __('Reporte inventario') }}
+                </flux:navlist.item>
+
             @endif
             {{--
                 <flux:navlist.item icon="book-open-text" href="https://laravel.com/docs/starter-kits#livewire" target="_blank">
