@@ -139,12 +139,26 @@ new class extends Component {
         ];
 
         /** INVENTARIO ACUMULADO REAL */
-        $carryKg  = array_fill_keys($this->materials, 0.0);
+        $carryKg = array_fill_keys($this->materials, 0.0);
         $carryAmt = array_fill_keys($this->materials, 0.0);
-
         // Guardar total de la semana anterior para “Semana anterior”
-        $lastWeekTotalKg  = array_fill_keys($this->materials, 0.0);
+        $lastWeekTotalKg = array_fill_keys($this->materials, 0.0);
         $lastWeekTotalAmt = array_fill_keys($this->materials, 0.0);
+
+        // Nuevo: Calcular acumulado hasta antes de la primera semana del año seleccionado
+        $firstOfMonth = Carbon::create($this->selectedYear, 1, 1)->startOfDay();
+        $firstWeekStart = $firstOfMonth->copy()->startOfWeek(Carbon::MONDAY);
+        $prevEnd = $firstWeekStart->copy()->subSecond();
+        $earlyFrom = Carbon::create(1900, 1, 1)->startOfDay();
+
+        $buysPrev = $this->sumBuys($this->selectedCompany, $earlyFrom, $prevEnd);
+        $patioPrev = $this->sumSales($this->selectedCompany, $earlyFrom, $prevEnd, Sale::TYPE_PATIO);
+        $genPrev = $this->sumSales($this->selectedCompany, $earlyFrom, $prevEnd, Sale::TYPE_GENERAL);
+
+        foreach ($this->materials as $mat) {
+            $lastWeekTotalKg[$mat] = (($patioPrev->get($mat)->kgs ?? 0) + ($genPrev->get($mat)->kgs ?? 0)) - ($buysPrev->get($mat)->kgs ?? 0);
+            $lastWeekTotalAmt[$mat] = (($patioPrev->get($mat)->total ?? 0) + ($genPrev->get($mat)->total ?? 0)) - ($buysPrev->get($mat)->total ?? 0);
+        }
 
         foreach (range(1, 12) as $month) {
 
@@ -166,7 +180,19 @@ new class extends Component {
             $sheet->getStyle("A1")->getFont()->setSize(24)->setBold(true)->getColor()->setARGB(Color::COLOR_WHITE);
             $sheet->getStyle("A1")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-            $row = 4;
+            /** AÑO DEL REPORTE */
+            $sheet->mergeCells("A2:{$endCol}2");
+            $sheet->setCellValue("A2", "Inventario semanal – Año {$this->selectedYear}");
+
+            $sheet->getStyle("A2")->getFont()
+                ->setSize(14)
+                ->setBold(true)
+                ->getColor()->setARGB(Color::COLOR_WHITE);
+
+            $sheet->getStyle("A2")->getAlignment()
+                ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $row = 5;
 
             /** SEMANAS DE 7 DÍAS */
             $weeks = [];
@@ -180,8 +206,8 @@ new class extends Component {
                 $start->addWeek();
             }
 
-            $lastWeekTotalKg  = array_fill_keys($this->materials, 0.0);
-            $lastWeekTotalAmt = array_fill_keys($this->materials, 0.0);
+            // $lastWeekTotalKg  = array_fill_keys($this->materials, 0.0);
+            // $lastWeekTotalAmt = array_fill_keys($this->materials, 0.0);
 
             foreach ($weeks as $index => $range) {
 
