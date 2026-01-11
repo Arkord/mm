@@ -3,6 +3,7 @@
 use App\Models\BuyItem;
 use App\Models\Sale;
 use App\Models\Company;
+use App\Models\Balance;
 use Livewire\Volt\Component;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
@@ -10,7 +11,6 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Conditional;
 use PhpOffice\PhpSpreadsheet\Style\Color;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 
@@ -42,18 +42,15 @@ new class extends Component {
         $firstOfMonth = Carbon::create($year, $month, 1)->startOfDay();
         $lastOfMonth  = $firstOfMonth->copy()->endOfMonth()->endOfDay();
 
-        // Primer lunes que toca al mes (puede ser del mes anterior)
         $start = $firstOfMonth->copy()->startOfWeek(Carbon::MONDAY);
 
         while (true) {
             $end = $start->copy()->endOfWeek(Carbon::SUNDAY)->endOfDay();
 
-            // Si la semana ya no intersecta el mes, detenemos
             if ($start->gt($lastOfMonth)) {
                 break;
             }
 
-            // La semana entra si toca al menos un día del mes
             if ($end->gte($firstOfMonth)) {
                 $weeks[] = [
                     'start' => $start->copy(),
@@ -72,7 +69,7 @@ new class extends Component {
         return BuyItem::selectRaw('material, SUM(kgs) as kgs, SUM(total) as total')
             ->whereHas('buy', fn ($q) =>
                 $q->where('company_id', $company)
-                ->whereBetween('fecha', [$from, $to])
+                    ->whereBetween('fecha', [$from, $to])
             )
             ->groupBy('material')
             ->get()
@@ -94,107 +91,62 @@ new class extends Component {
     {
         $spreadsheet = new Spreadsheet();
 
-        /** =========================
-         *  ESTILOS REUTILIZABLES
-         *  ========================= */
         $styleKg = [
-            'fill' => [
-                'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['argb' => Color::COLOR_WHITE],
-            ],
-            'font' => [
-                'color' => ['argb' => Color::COLOR_BLACK],
-            ],
-            'numberFormat' => [
-                'formatCode' => '#,##0.000',
-            ],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => Color::COLOR_WHITE]],
+            'font' => ['color' => ['argb' => Color::COLOR_BLACK]],
+            'numberFormat' => ['formatCode' => '#,##0.000'],
         ];
 
         $styleAmt = [
-            'fill' => [
-                'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['argb' => 'FFBFBFBF'],
-            ],
-            'font' => [
-                'color' => ['argb' => Color::COLOR_BLACK],
-            ],
-            'numberFormat' => [
-                'formatCode' => '$#,##0.00;-$#,##0.00',
-            ],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFBFBFBF']],
+            'font' => ['color' => ['argb' => Color::COLOR_BLACK]],
+            'numberFormat' => ['formatCode' => '$#,##0.00;-$#,##0.00'],
         ];
 
         $styleHeaderRed = [
-            'fill' => [
-                'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['argb' => 'FFC00000'],
-            ],
-            'font' => [
-                'bold' => true,
-                'color' => ['argb' => Color::COLOR_WHITE],
-            ],
-            'alignment' => [
-                'horizontal' => Alignment::HORIZONTAL_CENTER,
-                'vertical'   => Alignment::VERTICAL_CENTER,
-            ],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFC00000']],
+            'font' => ['bold' => true, 'color' => ['argb' => Color::COLOR_WHITE]],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
         ];
 
-        /** INVENTARIO ACUMULADO REAL */
-        $carryKg = array_fill_keys($this->materials, 0.0);
-        $carryAmt = array_fill_keys($this->materials, 0.0);
-        // Guardar total de la semana anterior para “Semana anterior”
-        $lastWeekTotalKg = array_fill_keys($this->materials, 0.0);
+        // Inicializamos carry y lastWeek
+        $lastWeekTotalKg  = array_fill_keys($this->materials, 0.0);
         $lastWeekTotalAmt = array_fill_keys($this->materials, 0.0);
 
-        // Nuevo: Calcular acumulado hasta antes de la primera semana del año seleccionado
-        $firstOfMonth = Carbon::create($this->selectedYear, 1, 1)->startOfDay();
-        $firstWeekStart = $firstOfMonth->copy()->startOfWeek(Carbon::MONDAY);
-        $prevEnd = $firstWeekStart->copy()->subSecond();
-        $earlyFrom = Carbon::create(1900, 1, 1)->startOfDay();
+        // === CARGA LA SUMA DE TODOS LOS BALANCES DEL AÑO ANTERIOR POR MATERIAL ===
+        $previousYear = $this->selectedYear - 1;
 
-        $buysPrev = $this->sumBuys($this->selectedCompany, $earlyFrom, $prevEnd);
-        $patioPrev = $this->sumSales($this->selectedCompany, $earlyFrom, $prevEnd, Sale::TYPE_PATIO);
-        $genPrev = $this->sumSales($this->selectedCompany, $earlyFrom, $prevEnd, Sale::TYPE_GENERAL);
+        $previousBalances = Balance::where('company_id', $this->selectedCompany)
+            ->where('anio', $previousYear)
+            ->selectRaw('material, SUM(kgs) as total_kgs, SUM(monto) as total_monto')
+            ->groupBy('material')
+            ->get()
+            ->keyBy('material');
 
-        foreach ($this->materials as $mat) {
-            $lastWeekTotalKg[$mat] = (($patioPrev->get($mat)->kgs ?? 0) + ($genPrev->get($mat)->kgs ?? 0)) - ($buysPrev->get($mat)->kgs ?? 0);
-            $lastWeekTotalAmt[$mat] = (($patioPrev->get($mat)->total ?? 0) + ($genPrev->get($mat)->total ?? 0)) - ($buysPrev->get($mat)->total ?? 0);
-        }
+        $applyInitialBalance = true;
 
         foreach (range(1, 12) as $month) {
 
-            $sheet = $month === 1
-                ? $spreadsheet->getActiveSheet()
-                : $spreadsheet->createSheet();
-
+            $sheet = $month === 1 ? $spreadsheet->getActiveSheet() : $spreadsheet->createSheet();
             $sheet->setTitle(Carbon::create()->month($month)->locale('es')->isoFormat('MMMM'));
 
-            $sheet->getStyle("A1:Z58")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(Color::COLOR_BLACK); 
+            $sheet->getStyle("A1:Z58")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB(Color::COLOR_BLACK);
             $sheet->getStyle("A1:Z58")->getFont()->setBold(true)->getColor()->setARGB(Color::COLOR_WHITE);
 
-            /** EMPRESA */
             $companyName = $this->companies[$this->selectedCompany] ?? '';
             $endCol = Coordinate::stringFromColumnIndex(count($this->materials) * 2 + 1);
             $sheet->mergeCells("A1:{$endCol}1");
             $sheet->setCellValue("A1", $companyName);
-
             $sheet->getStyle("A1")->getFont()->setSize(24)->setBold(true)->getColor()->setARGB(Color::COLOR_WHITE);
             $sheet->getStyle("A1")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-            /** AÑO DEL REPORTE */
             $sheet->mergeCells("A2:{$endCol}2");
             $sheet->setCellValue("A2", "Inventario semanal – Año {$this->selectedYear}");
-
-            $sheet->getStyle("A2")->getFont()
-                ->setSize(14)
-                ->setBold(true)
-                ->getColor()->setARGB(Color::COLOR_WHITE);
-
-            $sheet->getStyle("A2")->getAlignment()
-                ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("A2")->getFont()->setSize(14)->setBold(true)->getColor()->setARGB(Color::COLOR_WHITE);
+            $sheet->getStyle("A2")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
             $row = 5;
 
-            /** SEMANAS DE 7 DÍAS */
             $weeks = [];
             $firstOfMonth = Carbon::create($this->selectedYear, $month, 1)->startOfDay();
             $lastOfMonth  = $firstOfMonth->copy()->endOfMonth()->endOfDay();
@@ -206,19 +158,23 @@ new class extends Component {
                 $start->addWeek();
             }
 
-            // $lastWeekTotalKg  = array_fill_keys($this->materials, 0.0);
-            // $lastWeekTotalAmt = array_fill_keys($this->materials, 0.0);
-
             foreach ($weeks as $index => $range) {
 
-                /** TÍTULO SEMANA */
+                // === APLICAR LA SUMA DE TODOS LOS BALANCES DEL AÑO ANTERIOR ===
+                if ($month === 1 && $index === 0 && $applyInitialBalance) {
+                    foreach ($this->materials as $mat) {
+                        $balance = $previousBalances->get($mat);
+                        $lastWeekTotalKg[$mat]  = $balance?->total_kgs ?? 0.0;
+                        $lastWeekTotalAmt[$mat] = $balance?->total_monto ?? 0.0;
+                    }
+                    $applyInitialBalance = false;
+                }
+
                 $sheet->mergeCells("B{$row}:C{$row}");
                 $sheet->setCellValue("B{$row}", "Semana ".($index+1)." ({$range['start']->isoFormat('DD MMM')} - {$range['end']->isoFormat('DD MMM')})");
                 $sheet->getStyle("B{$row}:C{$row}")->applyFromArray($styleHeaderRed);
                 $row++;
 
-                /** MATERIALES */
-                $materialRow = $row;
                 $col = 2;
                 foreach ($this->materials as $mat) {
                     $from = Coordinate::stringFromColumnIndex($col).$row;
@@ -230,7 +186,6 @@ new class extends Component {
                 }
                 $row++;
 
-                /** KG / $ */
                 $col = 2;
                 foreach ($this->materials as $_) {
                     $sheet->setCellValue(Coordinate::stringFromColumnIndex($col).$row, 'Kg');
@@ -241,16 +196,15 @@ new class extends Component {
                 }
                 $row++;
 
-                /** DATOS */
                 $buys  = $this->sumBuys($this->selectedCompany, $range['start'], $range['end']);
                 $patio = $this->sumSales($this->selectedCompany, $range['start'], $range['end'], Sale::TYPE_PATIO);
                 $gen   = $this->sumSales($this->selectedCompany, $range['start'], $range['end'], Sale::TYPE_GENERAL);
 
                 $rows = [
                     'Semana anterior' => fn($m) => [-$lastWeekTotalKg[$m], -$lastWeekTotalAmt[$m]],
-                    'Compras semana'  => fn($m) => [$buys[$m]->kgs ?? 0,  $buys[$m]->total ?? 0],
-                    'Ventas patio'    => fn($m) => [$patio[$m]->kgs ?? 0, $patio[$m]->total ?? 0],
-                    'Ventas general'  => fn($m) => [$gen[$m]->kgs ?? 0,   $gen[$m]->total ?? 0],
+                    'Compras semana'  => fn($m) => [$buys->get($m)->kgs ?? 0, $buys->get($m)->total ?? 0],
+                    'Ventas patio'    => fn($m) => [$patio->get($m)->kgs ?? 0, $patio->get($m)->total ?? 0],
+                    'Ventas general'  => fn($m) => [$gen->get($m)->kgs ?? 0, $gen->get($m)->total ?? 0],
                 ];
 
                 foreach ($rows as $label => $calc) {
@@ -267,62 +221,45 @@ new class extends Component {
                     $row++;
                 }
 
-                $getKgs = fn($x) =>
-                    is_object($x) ? ($x->kgs ?? 0)
-                : (is_array($x)  ? ($x['kgs'] ?? 0)
-                : 0);
-
-                $getAmt = fn($x) =>
-                    is_object($x) ? ($x->total ?? 0)
-                : (is_array($x)  ? ($x['total'] ?? 0)
-                : 0);
-
+                // Cálculo del total de la semana
                 $weekTotalKg  = [];
                 $weekTotalAmt = [];
 
-               foreach ($this->materials as $mat) {
+                foreach ($this->materials as $mat) {
+                    $buyKg   = $buys->get($mat)->kgs ?? 0;
+                    $buyAmt  = $buys->get($mat)->total ?? 0;
+                    $saleKg  = ($patio->get($mat)->kgs ?? 0) + ($gen->get($mat)->kgs ?? 0);
+                    $saleAmt = ($patio->get($mat)->total ?? 0) + ($gen->get($mat)->total ?? 0);
 
-                    $weekTotalKg[$mat] =
-                        ($getKgs($patio[$mat] ?? null) + $getKgs($gen[$mat] ?? null))
-                    - (-$lastWeekTotalKg[$mat] + $getKgs($buys[$mat] ?? null));
-
-                    $weekTotalAmt[$mat] =
-                        ($getAmt($patio[$mat] ?? null) + $getAmt($gen[$mat] ?? null))
-                    - (-$lastWeekTotalAmt[$mat] + $getAmt($buys[$mat] ?? null));
+                    $weekTotalKg[$mat]  = $saleKg - (-$lastWeekTotalKg[$mat] + $buyKg);
+                    $weekTotalAmt[$mat] = $saleAmt - (-$lastWeekTotalAmt[$mat] + $buyAmt);
                 }
 
-                /** TOTAL */
+                // Escribir TOTAL
                 $sheet->setCellValue("A{$row}", 'TOTAL');
                 $col = 2;
                 foreach ($this->materials as $mat) {
-                    $colKg  = Coordinate::stringFromColumnIndex($col);
-                    $colAmt = Coordinate::stringFromColumnIndex($col+1);
-
-                    $sheet->setCellValue("{$colKg}{$row}", $weekTotalKg[$mat]);
-                    $sheet->setCellValue("{$colAmt}{$row}", $weekTotalAmt[$mat]);
-
-                    $sheet->getStyle("{$colKg}{$row}")->applyFromArray($styleKg);
-                    $sheet->getStyle("{$colAmt}{$row}")->applyFromArray($styleAmt);
-
+                    $sheet->setCellValue(Coordinate::stringFromColumnIndex($col).$row, $weekTotalKg[$mat]);
+                    $sheet->setCellValue(Coordinate::stringFromColumnIndex($col+1).$row, $weekTotalAmt[$mat]);
+                    $sheet->getStyle(Coordinate::stringFromColumnIndex($col).$row)->applyFromArray($styleKg);
+                    $sheet->getStyle(Coordinate::stringFromColumnIndex($col+1).$row)->applyFromArray($styleAmt);
                     $col += 2;
                 }
+                $row++;
 
-                foreach ($this->materials as $mat) {
-                    $lastWeekTotalKg[$mat]  = $weekTotalKg[$mat];
-                    $lastWeekTotalAmt[$mat] = $weekTotalAmt[$mat];
-                }
+                // Actualizar carry para la próxima semana
+                $lastWeekTotalKg  = $weekTotalKg;
+                $lastWeekTotalAmt = $weekTotalAmt;
 
-                $row += 3;
+                $row += 2; // Espacio
             }
 
-            /** AJUSTE DE COLUMNAS */
             $sheet->getColumnDimension('A')->setWidth(22);
             foreach (range('B', $sheet->getHighestColumn()) as $c) {
                 $sheet->getColumnDimension($c)->setWidth(14);
             }
         }
 
-        /** NO PRECALCULAR FÓRMULAS */
         $writer = new Xlsx($spreadsheet);
         $writer->setPreCalculateFormulas(false);
 

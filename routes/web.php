@@ -52,7 +52,10 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Volt::route('sales', 'sales.index')->name('sales.index');
     Volt::route('sales/create', 'sales.create')->name('sales.create');
 
-    Volt::route('patio-update', 'sales.patio-update')->name('sales.patio-update');
+    // Volt::route('patio-update', 'sales.patio-update')->name('sales.patio-update');
+
+     // Rutas de Balances
+    Volt::route('balances', 'balances.index')->name('balances.index');
 });
 
 require __DIR__ . '/auth.php';

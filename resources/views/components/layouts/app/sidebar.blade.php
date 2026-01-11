@@ -47,13 +47,18 @@
                     <flux:navlist.item icon="users" :href="route('users.index')"
                         :current="request()->routeIs('users.index')" wire:navigate>{{ __('Usuarios') }}
                     </flux:navlist.item>
+
+                    <flux:navlist.item icon="scale" :href="route('balances.index')"
+                        :current="request()->routeIs('balances.index')" wire:navigate>{{ __('Balances') }}
+                    </flux:navlist.item>
+
                     <flux:navlist.item icon="archive-box-x-mark" :href="route('sales.index')"
                         :current="request()->routeIs('sales.index')" wire:navigate>{{ __('Ventas General') }}
                     </flux:navlist.item>
 
-                     <flux:navlist.item icon="archive-box-x-mark" :href="route('sales.patio-update')"
+                     {{-- <flux:navlist.item icon="archive-box-x-mark" :href="route('sales.patio-update')"
                         :current="request()->routeIs('sales.patio-update')" wire:navigate>{{ __('Ventas Patio Precio') }}
-                    </flux:navlist.item>
+                    </flux:navlist.item> --}}
 
                 @endif
             </flux:navlist.group>
