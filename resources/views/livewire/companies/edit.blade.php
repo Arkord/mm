@@ -24,7 +24,7 @@ new class extends Component {
         $this->validate([
             'name' => 'required|string|max:255',
             'color' => 'required|string',
-            'logo' => 'nullable|image|max:10240',
+            'logo' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:10240',
         ]);
 
         if ($this->logo) {

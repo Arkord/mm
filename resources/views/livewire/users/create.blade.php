@@ -65,7 +65,7 @@ new class extends Component {
         <!-- Foto -->
         <div>
             <label class="block font-semibold mb-1">Foto de perfil</label>
-            <input type="file" wire:model="photo" accept="image/*" class="w-full border rounded px-3 py-2 cursor-pointer">
+            <input type="file" wire:model="photo" accept="image/png,image/jpeg,image/gif" class="w-full border rounded px-3 py-2 cursor-pointer">
             @error('photo')
                 <span class="text-red-500 text-sm">{{ $message }}</span>
             @enderror

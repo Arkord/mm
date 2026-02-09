@@ -16,7 +16,7 @@ new class extends Component {
         $this->validate([
             'name' => 'required|string|max:255',
             'color' => 'required|string',
-            'logo' => 'nullable|image|max:10240',
+            'logo' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:10240',
         ]);
 
         $path = $this->logo ? $this->logo->store('companies', 'public') : null;
@@ -44,7 +44,7 @@ new class extends Component {
 
         <div>
             <label class="block">Logo</label>
-            <input type="file" wire:model="logo" class="w-full border-2" style="cursor: pointer">
+            <input type="file" wire:model="logo" class="w-full border-2" accept="image/png,image/jpeg,image/gif" style="cursor: pointer">
             @if ($logo)
                 <img src="{{ $logo->temporaryUrl() }}" class="h-16 mt-2">
             @endif

@@ -109,7 +109,7 @@ new class extends Component {
                 >
 
                 <div class="flex-1">
-                    <input type="file" wire:model="photo" accept="image/*" class="w-full border rounded px-3 py-2 text-sm cursor-pointer">
+                    <input type="file" wire:model="photo" accept="image/png,image/jpeg,image/gif" class="w-full border rounded px-3 py-2 text-sm cursor-pointer">
                     <p class="text-xs text-gray-500 mt-1">Deja vacío para mantener la actual</p>
                 </div>
             </div>
